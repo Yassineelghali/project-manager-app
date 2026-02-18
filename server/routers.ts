@@ -1,11 +1,10 @@
-import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getAllProjects, getProjectById, getSubprojectsByProjectId, getCollaboratorsBySubprojectId, getAllMeetings, getMeetingsByProjectId, getMeetingById, getTasksByMeetingId, getTasksByMeetingAndCollaborator, getTaskById, getTaskHistory } from "./db";
 
 export const appRouter = router({
+    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -18,61 +17,12 @@ export const appRouter = router({
     }),
   }),
 
-  projects: router({
-    list: publicProcedure.query(async () => {
-      const allProjects = await getAllProjects();
-      return allProjects.map(p => ({
-        ...p,
-        dateFrom: p.dateFrom,
-        dateTo: p.dateTo,
-      }));
-    }),
-    getById: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getProjectById(input);
-    }),
-  }),
-
-  subprojects: router({
-    listByProject: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getSubprojectsByProjectId(input);
-    }),
-  }),
-
-  collaborators: router({
-    listBySubproject: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getCollaboratorsBySubprojectId(input);
-    }),
-  }),
-
-  meetings: router({
-    list: publicProcedure.query(async () => {
-      return await getAllMeetings();
-    }),
-    listByProject: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getMeetingsByProjectId(input);
-    }),
-    getById: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getMeetingById(input);
-    }),
-  }),
-
-  tasks: router({
-    listByMeeting: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getTasksByMeetingId(input);
-    }),
-    listByMeetingAndCollaborator: publicProcedure.input(z.object({ meetingId: z.number(), collaboratorId: z.number() })).query(async ({ input }) => {
-      return await getTasksByMeetingAndCollaborator(input.meetingId, input.collaboratorId);
-    }),
-    getById: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getTaskById(input);
-    }),
-  }),
-
-  taskHistory: router({
-    listByTask: publicProcedure.input(z.number()).query(async ({ input }) => {
-      return await getTaskHistory(input);
-    }),
-  }),
+  // TODO: add feature routers here, e.g.
+  // todo: router({
+  //   list: protectedProcedure.query(({ ctx }) =>
+  //     db.getUserTodos(ctx.user.id)
+  //   ),
+  // }),
 });
 
 export type AppRouter = typeof appRouter;
