@@ -1,0 +1,94 @@
+{
+  "query": "SHOW TABLES; DESCRIBE projects; DESCRIBE tasks;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2PoBU2RgLoaE9sV.root --database NX7JNUxvmB44ePzHWEReo2 --execute SHOW TABLES; DESCRIBE projects; DESCRIBE tasks;",
+  "rows": [
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "collaborators"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "meetings"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "projects"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "subprojects"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "taskHistory"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "tasks"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "users"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "Field\tType\tNull\tKey\tDefault\tExtra"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "id\tint\tNO\tPRI\tNULL\tauto_increment"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "name\tvarchar(255)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "code\tvarchar(50)\tNO\tUNI\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "color\tvarchar(7)\tNO\t\t#00A8CC\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "dateFrom\tvarchar(10)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "dateTo\tvarchar(10)\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "createdAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "updatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "Field\tType\tNull\tKey\tDefault\tExtra"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "id\tint\tNO\tPRI\tNULL\tauto_increment"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "meetingId\tint\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "collaboratorId\tint\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "sectionKey\tvarchar(50)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "title\tvarchar(255)\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "description\ttext\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "status\tvarchar(50)\tNO\t\tOpen\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "deadline\tvarchar(10)\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "createdAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t"
+    },
+    {
+      "Tables_in_NX7JNUxvmB44ePzHWEReo2": "updatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_NX7JNUxvmB44ePzHWEReo2\n__drizzle_migrations\ncollaborators\nmeetings\nprojects\nsubprojects\ntaskHistory\ntasks\nusers\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nname\tvarchar(255)\tNO\t\tNULL\t\ncode\tvarchar(50)\tNO\tUNI\tNULL\t\ncolor\tvarchar(7)\tNO\t\t#00A8CC\t\ndateFrom\tvarchar(10)\tNO\t\tNULL\t\ndateTo\tvarchar(10)\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\nField\tType\tNull\tKey\tDefault\tExtra\nid\tint\tNO\tPRI\tNULL\tauto_increment\nmeetingId\tint\tNO\t\tNULL\t\ncollaboratorId\tint\tNO\t\tNULL\t\nsectionKey\tvarchar(50)\tNO\t\tNULL\t\ntitle\tvarchar(255)\tNO\t\tNULL\t\ndescription\ttext\tYES\t\tNULL\t\nstatus\tvarchar(50)\tNO\t\tOpen\t\ndeadline\tvarchar(10)\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 750
+}
