@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, projects, subprojects, collaborators, meetings, tasks, taskHistory } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,73 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getAllProjects() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(projects);
+}
+
+export async function getProjectById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getSubprojectsByProjectId(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(subprojects).where(eq(subprojects.projectId, projectId));
+}
+
+export async function getCollaboratorsBySubprojectId(subprojectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(collaborators).where(eq(collaborators.subprojectId, subprojectId));
+}
+
+export async function getAllMeetings() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(meetings);
+}
+
+export async function getMeetingsByProjectId(projectId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(meetings).where(eq(meetings.projectId, projectId));
+}
+
+export async function getMeetingById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(meetings).where(eq(meetings.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getTasksByMeetingId(meetingId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(eq(tasks.meetingId, meetingId));
+}
+
+export async function getTasksByMeetingAndCollaborator(meetingId: number, collaboratorId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(tasks).where(
+    and(eq(tasks.meetingId, meetingId), eq(tasks.collaboratorId, collaboratorId))
+  );
+}
+
+export async function getTaskById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getTaskHistory(taskId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(taskHistory).where(eq(taskHistory.taskId, taskId));
+}

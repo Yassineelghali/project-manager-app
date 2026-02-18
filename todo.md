@@ -5,16 +5,20 @@
 - [x] Run database migrations
 - [x] Verify database connectivity and persistence
 
+## Seed Data
+- [x] Create seed data script with example projects, collaborators, meetings, and tasks
+- [x] Run seed script to populate database
+
 ## Backend API (tRPC Procedures)
-- [ ] Create project management procedures (create, read, update, delete)
-- [ ] Create subproject procedures
-- [ ] Create collaborator procedures
-- [ ] Create meeting procedures
-- [ ] Create task procedures with history tracking
-- [ ] Add database query helpers in server/db.ts
+- [x] Add database query helpers in server/db.ts
+- [x] Create project management procedures (create, read, update, delete)
+- [x] Create subproject procedures
+- [x] Create collaborator procedures
+- [x] Create meeting procedures
+- [x] Create task procedures with history tracking
 
 ## Frontend Features
-- [ ] Build project dashboard page
+- [x] Build project dashboard page
 - [ ] Build projects & scope management page
 - [ ] Build meetings list page
 - [ ] Build meeting detail view with task management
