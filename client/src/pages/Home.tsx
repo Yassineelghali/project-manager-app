@@ -82,6 +82,16 @@ const STATUS_META = {
   Closed:  { color: "#4EC99A", bg: "rgba(78,201,154,0.12)", label: "Closed" },
 };
 
+// ─── DEPARTMENTS & TEAMS ────────────────────────────────────────────────────
+
+const DEPARTMENTS_TEAMS = {
+  ESW: { name: "ESW", teams: ["EE", "DAI", "SW Coding", "SMBD"] },
+  VSP: { name: "VSP", teams: ["CT1", "CT2", "CT3", "SD1", "SD2", "VAH"] },
+  MDS: { name: "MDS", teams: ["SD", "MS", "CD&I"] }
+};
+
+const AVL_LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663030990083/MraiIlghFkQrjJjT.png";
+
 function genId() { return Math.random().toString(36).slice(2, 9); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"; }
 function today() { return new Date().toISOString().slice(0, 10); }
@@ -898,12 +908,22 @@ function LoginScreen({ onLogin }) {
               <input className="form-input" type="email" value={signupForm.email} onChange={e => setSignupForm(f => ({ ...f, email: e.target.value }))} placeholder="jean.dupont@avl.com" />
             </div>
             <div className="form-group">
-              <label className="form-label">Équipe *</label>
-              <input className="form-input" value={signupForm.team} onChange={e => setSignupForm(f => ({ ...f, team: e.target.value }))} placeholder="Powertrain Team" />
+              <label className="form-label">Département *</label>
+              <select className="form-select" value={signupForm.department} onChange={e => setSignupForm(f => ({ ...f, department: e.target.value, team: "" }))}>
+                <option value="">Sélectionner un département</option>
+                {Object.entries(DEPARTMENTS_TEAMS).map(([key, dept]) => (
+                  <option key={key} value={key}>{dept.name}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Département</label>
-              <input className="form-input" value={signupForm.department} onChange={e => setSignupForm(f => ({ ...f, department: e.target.value }))} placeholder="Engineering" />
+              <label className="form-label">Équipe *</label>
+              <select className="form-select" value={signupForm.team} onChange={e => setSignupForm(f => ({ ...f, team: e.target.value }))} disabled={!signupForm.department}>
+                <option value="">Sélectionner une équipe</option>
+                {signupForm.department && DEPARTMENTS_TEAMS[signupForm.department as keyof typeof DEPARTMENTS_TEAMS]?.teams.map(team => (
+                  <option key={team} value={team}>{team}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Rôle</label>
@@ -2149,36 +2169,9 @@ export default function App() {
         {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="sidebar-logo">
-            <div style={{ 
-              width: 100, 
-              height: 48, 
-              background: 'linear-gradient(135deg, #00578A 0%, #0073B3 100%)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,87,138,0.3)'
-            }}>
-              <svg viewBox="0 0 200 80" width="90" height="43" style={{ marginLeft: -2 }}>
-                <defs>
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-                <text x="10" y="55" fontFamily="'Arial Black', sans-serif" fontSize="48" fontWeight="900" fill="white" filter="url(#glow)">AVL</text>
-                <circle cx="140" cy="22" r="7" fill="white" opacity="0.9" />
-                <circle cx="160" cy="28" r="6" fill="white" opacity="0.85" />
-                <circle cx="180" cy="20" r="5.5" fill="white" opacity="0.8" />
-                <circle cx="155" cy="42" r="6.5" fill="white" opacity="0.9" />
-                <circle cx="172" cy="38" r="5.8" fill="white" opacity="0.85" />
-              </svg>
-            </div>
+            <img src={AVL_LOGO_URL} alt="AVL Logo" style={{ width: 100, height: 48, objectFit: 'contain' }} />
             <div style={{ marginLeft: 8 }}>
-              <div className="logo-text" style={{ fontSize: 12, lineHeight: 1.2 }}>AVL Team<br/>Meeting</div>
+              <div className="logo-text" style={{ fontSize: 11, lineHeight: 1.2 }}>Meeting<br/>Tracker</div>
               <div className="logo-sub">v1.0</div>
             </div>
           </div>
