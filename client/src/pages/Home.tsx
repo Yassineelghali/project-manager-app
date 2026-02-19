@@ -1448,6 +1448,46 @@ function ProjectFormModal({ project, onSave, onClose }) {
   );
 }
 
+// ── SUBPROJECT FORM MODAL ──
+function SubprojectFormModal({ subproject, onSave, onClose }) {
+  const [form, setForm] = useState(subproject || { name: "", code: "", date_from: today(), date_to: "" });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-head">
+          <span className="modal-title">Edit Sub-Project</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Sub-Project Name *</label>
+            <input className="form-input" value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Torque Management" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Project Code</label>
+            <input className="form-input" value={form.code} onChange={e => set("code", e.target.value)} placeholder="TQ-001" />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Date From</label>
+              <input className="form-input" type="date" value={form.date_from} onChange={e => set("date_from", e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date To (Leave empty to reactivate)</label>
+              <input className="form-input" type="date" value={form.date_to} onChange={e => set("date_to", e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { if (form.name.trim()) onSave(form); }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── COLLABORATOR FORM MODAL ──
 function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
   const [form, setForm] = useState(collab || { name: "", initials: "", subprojectId: subprojects[0]?.id || "", date_from: today(), date_to: "" });
@@ -1923,6 +1963,9 @@ export default function App() {
 
         {projectModal !== null && (
           <ProjectFormModal project={projectModal.id ? projectModal : null} onSave={saveProject} onClose={() => setProjectModal(null)} />
+        )}
+        {editSubproject !== null && (
+          <SubprojectFormModal subproject={editSubproject} onSave={saveSubproject} onClose={() => setEditSubproject(null)} />
         )}
         {collabModal !== null && (
           <CollabFormModal collab={collabModal.id ? collabModal : null} subprojects={allSubprojects} projects={projects} onSave={saveCollab} onClose={() => setCollabModal(null)} />
