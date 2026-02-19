@@ -90,7 +90,7 @@ const DEPARTMENTS_TEAMS = {
   MDS: { name: "MDS", teams: ["SD", "MS", "CD&I"] }
 };
 
-const AVL_LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310419663030990083/MraiIlghFkQrjJjT.png";
+const AVL_LOGO_URL = "/avl-logo.png";
 
 function genId() { return Math.random().toString(36).slice(2, 9); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"; }
@@ -1574,7 +1574,9 @@ export default function App() {
   function handleLogin(user) { setLoggedInUser(user); setView("dashboard"); }
   function handleLogout() { setLoggedInUser(null); setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false); }
   function handleSaveAccount(form) {
-    setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team }));
+    // Calculate new initials from the name
+    const newInitials = form.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
 
   // ── Show login screen if not authenticated ──
@@ -1977,6 +1979,16 @@ export default function App() {
       setEditMeeting(null);
     }
 
+    function deleteMeeting(id) {
+      if (confirm('Êtes-vous sûr de vouloir supprimer cette meeting page?')) {
+        setMeetings(prev => prev.filter(m => m.id !== id));
+        if (selectedMeetingId === id) {
+          setSelectedMeetingId(null);
+          setView("meetings");
+        }
+      }
+    }
+
     return (
       <div>
         <div className="section-header" style={{ marginBottom: 16 }}>
@@ -2012,7 +2024,10 @@ export default function App() {
                 {opCount > 0 && <span className="tag" style={{ color: "#FF9B3D", borderColor: "rgba(255,155,61,0.3)" }}>{opCount} open pts</span>}
               </div>
               {isTL && (
-                <button className="btn btn-ghost btn-xs" onClick={e => { e.stopPropagation(); setEditMeeting(m); }}>✏</button>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button className="btn btn-ghost btn-xs" onClick={e => { e.stopPropagation(); setEditMeeting(m); }}>✏</button>
+                  <button className="btn btn-danger btn-xs" onClick={e => { e.stopPropagation(); deleteMeeting(m.id); }}>✕</button>
+                </div>
               )}
             </div>
           );
