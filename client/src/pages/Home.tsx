@@ -7,16 +7,16 @@ const INITIAL_PROJECTS = [
     id: "p1", name: "Powertrain ECU", code: "ECU-24", color: "#00A8CC",
     date_from: "2024-01-01", date_to: "2025-12-31",
     subprojects: [
-      { id: "sp1", name: "Torque Management", projectId: "p1" },
-      { id: "sp2", name: "Fuel Control", projectId: "p1" },
+      { id: "sp1", name: "Torque Management", code: "TQ-001", projectId: "p1", date_from: "2024-01-01", date_to: "2025-12-31" },
+      { id: "sp2", name: "Fuel Control", code: "FC-001", projectId: "p1", date_from: "2024-03-01", date_to: "2025-12-31" },
     ]
   },
   {
     id: "p2", name: "ADAS Integration", code: "ADAS-25", color: "#2E5EAA",
     date_from: "2025-01-01", date_to: "2026-06-30",
     subprojects: [
-      { id: "sp3", name: "Sensor Fusion", projectId: "p2" },
-      { id: "sp4", name: "Path Planning", projectId: "p2" },
+      { id: "sp3", name: "Sensor Fusion", code: "SF-001", projectId: "p2", date_from: "2025-01-01", date_to: "2026-06-30" },
+      { id: "sp4", name: "Path Planning", code: "PP-001", projectId: "p2", date_from: "2025-02-01", date_to: "2026-06-30" },
     ]
   }
 ];
@@ -786,33 +786,8 @@ function LoginScreen({ onLogin }) {
       {/* LEFT PANEL */}
       <div className="login-left">
         <div className="login-logo">
-          <div style={{ 
-            width: 140, 
-            height: 66, 
-            background: 'linear-gradient(135deg, #00578A 0%, #0073B3 100%)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            borderRadius: 6,
-            boxShadow: '0 4px 16px rgba(0,87,138,0.4)'
-          }}>
-            <svg viewBox="0 0 200 80" width="125" height="60">
-              <defs>
-                <filter id="glow-login">
-                  <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <text x="10" y="55" fontFamily="'Arial Black', sans-serif" fontSize="48" fontWeight="900" fill="white" filter="url(#glow-login)">AVL</text>
-              <circle cx="140" cy="22" r="7" fill="white" opacity="0.9" />
-              <circle cx="160" cy="28" r="6" fill="white" opacity="0.85" />
-              <circle cx="180" cy="20" r="5.5" fill="white" opacity="0.8" />
-              <circle cx="155" cy="42" r="6.5" fill="white" opacity="0.9" />
-              <circle cx="172" cy="38" r="5.8" fill="white" opacity="0.85" />
-            </svg>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+            <img src="/avl-logo.png" alt="AVL Logo" style={{ width: 120, height: 60, objectFit: "contain" }} />
           </div>
           <div>
             <div className="login-logo-name">AVL Team Meeting</div>
@@ -1800,6 +1775,7 @@ export default function App() {
     const [projectModal, setProjectModal] = useState(null);
     const [subprojectInput, setSubprojectInput] = useState("");
     const [collabModal, setCollabModal] = useState(null);
+    const [editSubproject, setEditSubproject] = useState(null);
 
     function saveProject(form) {
       if (form.id) {
@@ -1819,10 +1795,23 @@ export default function App() {
 
     function addSubproject() {
       if (!subprojectInput.trim() || !selectedProject) return;
-      const sp = { id: genId(), name: subprojectInput.trim(), projectId: selectedProject.id };
+      const sp = { id: genId(), name: subprojectInput.trim(), code: "", projectId: selectedProject.id, date_from: today(), date_to: "" };
       setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, subprojects: [...(p.subprojects || []), sp] } : p));
       setSelectedProject(prev => ({ ...prev, subprojects: [...(prev.subprojects || []), sp] }));
       setSubprojectInput("");
+    }
+
+    function saveSubproject(form) {
+      setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, subprojects: (p.subprojects || []).map(sp => sp.id === form.id ? { ...sp, ...form } : sp) } : p));
+      setSelectedProject(prev => ({ ...prev, subprojects: (prev.subprojects || []).map(sp => sp.id === form.id ? { ...sp, ...form } : sp) }));
+      setEditSubproject(null);
+    }
+
+    function deleteSubproject(spId) {
+      if (confirm('Êtes-vous sûr de vouloir supprimer ce sub-project?')) {
+        setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, subprojects: (p.subprojects || []).filter(sp => sp.id !== spId) } : p));
+        setSelectedProject(prev => ({ ...prev, subprojects: (prev.subprojects || []).filter(sp => sp.id !== spId) }));
+      }
     }
 
     function saveCollab(form) {
@@ -1863,13 +1852,22 @@ export default function App() {
                     </div>
                     {selectedProject?.id === p.id && (
                       <div className="tree-sub">
-                        {(p.subprojects || []).map(sp => (
-                          <div key={sp.id} className="tree-item">
-                            <div className="tree-dot" style={{ background: p.color, opacity: 0.4 }} />
-                            <span className="tree-name">{sp.name}</span>
-                            <span className="tree-badge">{collaborators.filter(c=>c.subprojectId===sp.id).length} collabs</span>
-                          </div>
-                        ))}
+                        {(p.subprojects || []).map(sp => {
+                          const isClosed = sp.date_to && sp.date_to < today();
+                          return (
+                            <div key={sp.id} className="tree-item" style={{ opacity: isClosed ? 0.6 : 1 }}>
+                              <div className="tree-dot" style={{ background: p.color, opacity: isClosed ? 0.2 : 0.4 }} />
+                              <span className="tree-name">{sp.name} {isClosed && "(Cloture)"}</span>
+                              <span className="tree-badge">{sp.code || "--"}</span>
+                              {isTL && (
+                                <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                                  <button className="btn btn-ghost btn-xs" onClick={e => { e.stopPropagation(); setEditSubproject(sp); }}>✏</button>
+                                  <button className="btn btn-danger btn-xs" onClick={e => { e.stopPropagation(); deleteSubproject(sp.id); }}>✕</button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {isTL && (
                           <div style={{ display: "flex", gap: 6, padding: "6px 8px" }}>
                             <input className="form-input" value={subprojectInput} onChange={e=>setSubprojectInput(e.target.value)} placeholder="New sub-project…" onKeyDown={e=>e.key==="Enter"&&addSubproject()} style={{ fontSize: 12 }} />
