@@ -1329,8 +1329,8 @@ function TaskModal({ task, collaborators, isTL, onSave, onDelete, onClose }) {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Deadline</label>
-              <input className="form-input" type="date" value={form.deadline || ""} onChange={e => set("deadline", e.target.value)} />
+              <label className="form-label">Deadline {!isTL && "(TL only)"}</label>
+              <input className="form-input" type="date" value={form.deadline || ""} onChange={e => isTL && set("deadline", e.target.value)} disabled={!isTL} />
             </div>
           </div>
           {task.history && task.history.length > 0 && (
@@ -1354,6 +1354,7 @@ function TaskModal({ task, collaborators, isTL, onSave, onDelete, onClose }) {
         </div>
         <div className="modal-footer">
           {task.id && isTL && <button className="btn btn-danger btn-sm" onClick={() => onDelete(task.id)}>Delete</button>}
+          {task.id && !isTL && <span style={{ fontSize: 12, color: "var(--text3)", marginRight: 8 }}>Collaborator View — Limited Editing</span>}
           <div style={{ flex: 1 }} />
           <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary btn-sm" onClick={() => { if (form.title?.trim()) onSave(form); }}>Save</button>
@@ -1646,9 +1647,21 @@ export default function App() {
       const histEntry = changes.length > 0 ? { text: `${!isTL ? (collab?.name || "Collaborator") : "TL"} — ${changes.join(", ")}`, time: `Today ${now}` } : null;
       const updatedTask = { ...originalTask, ...formData, history: [...(originalTask.history || []), ...(histEntry ? [histEntry] : [])] };
 
-      updateMeetingSection(meetingId, collabId, sectionKey, tasks =>
-        tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
-      );
+      // Auto-categorize: move task to appropriate section based on status
+      let newSection = sectionKey;
+      if (formData.status === "Closed") newSection = "closed";
+      else if (formData.status === "Ongoing") newSection = "current";
+      else if (formData.status === "Open" && sectionKey === "upcoming") newSection = "upcoming";
+      else if (formData.status === "Open") newSection = "upcoming";
+
+      if (newSection !== sectionKey) {
+        updateMeetingSection(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== updatedTask.id));
+        updateMeetingSection(meetingId, collabId, newSection, tasks => [...tasks, updatedTask]);
+      } else {
+        updateMeetingSection(meetingId, collabId, sectionKey, tasks =>
+          tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+        );
+      }
       if (!isTL && changes.length > 0) {
         addNotification(`<strong>${collab?.name}</strong> ${changes.join(", ")} on <em>${formData.title}</em>`, "✏");
       }
@@ -1836,8 +1849,10 @@ export default function App() {
     function addSubproject() {
       if (!subprojectInput.trim() || !selectedProject) return;
       const sp = { id: genId(), name: subprojectInput.trim(), code: "", projectId: selectedProject.id, date_from: today(), date_to: "" };
-      setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, subprojects: [...(p.subprojects || []), sp] } : p));
-      setSelectedProject(prev => ({ ...prev, subprojects: [...(prev.subprojects || []), sp] }));
+      const updatedProjects = projects.map(p => p.id === selectedProject.id ? { ...p, subprojects: [...(p.subprojects || []), sp] } : p);
+      setProjects(updatedProjects);
+      const updatedProject = updatedProjects.find(p => p.id === selectedProject.id);
+      setSelectedProject(updatedProject || selectedProject);
       setSubprojectInput("");
     }
 
@@ -1990,16 +2005,37 @@ export default function App() {
     const [filterProject, setFilterProject] = useState(meetingViewProject || (collabProjects.length === 1 ? collabProjects[0].id : "all"));
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editMeeting, setEditMeeting] = useState(null);
+    const [timeFilter, setTimeFilter] = useState("all");
+    const [selectedMonth, setSelectedMonth] = useState(today().slice(0, 7));
+    const [selectedYear, setSelectedYear] = useState(today().slice(0, 4));
+
+    // Helper to get week number
+    function getWeekNumber(d) {
+      const date = new Date(d);
+      const firstDay = new Date(date.getFullYear(), 0, 1);
+      const pastDaysOfYear = (date - firstDay) / 86400000;
+      return Math.ceil((pastDaysOfYear + firstDay.getDay() + 1) / 7);
+    }
 
     // Filter meetings based on role
-    const filtered = isTL 
+    let filtered = isTL 
       ? meetings.filter(m => filterProject === "all" || m.projectId === filterProject)
       : meetings.filter(m => {
-          // Collaborator: only meetings where they are present AND match project filter
           const hasSection = m.sections && m.sections[collabUserId];
           const matchesFilter = filterProject === "all" || m.projectId === filterProject;
           return hasSection && matchesFilter;
         });
+
+    // Apply time filter
+    if (timeFilter === "month") {
+      filtered = filtered.filter(m => m.date.slice(0, 7) === selectedMonth);
+    } else if (timeFilter === "year") {
+      filtered = filtered.filter(m => m.date.slice(0, 4) === selectedYear);
+    } else if (timeFilter === "week") {
+      const currentWeek = getWeekNumber(today());
+      const currentYear = today().slice(0, 4);
+      filtered = filtered.filter(m => getWeekNumber(m.date) === currentWeek && m.date.slice(0, 4) === currentYear);
+    }
 
     function createMeeting(form) {
       const project = projects.find(p => p.id === form.projectId);
@@ -2028,6 +2064,17 @@ export default function App() {
           setView("meetings");
         }
       }
+    }
+
+    function duplicateMeeting(meeting) {
+      const newMeeting = {
+        ...meeting,
+        id: genId(),
+        title: meeting.title + " (Copy)",
+        sections: JSON.parse(JSON.stringify(meeting.sections))
+      };
+      setMeetings(prev => [...prev, newMeeting]);
+      addNotification(`Meeting <em>${meeting.title}</em> duplicated as <em>${newMeeting.title}</em>`, "📋");
     }
 
     return (
@@ -2066,6 +2113,7 @@ export default function App() {
               </div>
               {isTL && (
                 <div style={{ display: "flex", gap: 4 }}>
+                  <button className="btn btn-ghost btn-xs" title="Duplicate" onClick={e => { e.stopPropagation(); duplicateMeeting(m); }}>📋</button>
                   <button className="btn btn-ghost btn-xs" onClick={e => { e.stopPropagation(); setEditMeeting(m); }}>✏</button>
                   <button className="btn btn-danger btn-xs" onClick={e => { e.stopPropagation(); deleteMeeting(m.id); }}>✕</button>
                 </div>
