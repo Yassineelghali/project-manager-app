@@ -1895,9 +1895,14 @@ export default function App() {
                 <span className="panel-title">Projects</span>
               </div>
               <div className="panel-body">
-                {projects.map(p => (
+                {projects.map(p => {
+                  const isSelected = selectedProject?.id === p.id;
+                  return (
                   <div key={p.id}>
-                    <div className={`tree-item ${selectedProject?.id === p.id ? "selected" : ""}`} onClick={() => setSelectedProject(p)}>
+                    <div className={`tree-item ${isSelected ? "selected" : ""}`} onClick={() => {
+                      const projectToSelect = projects.find(proj => proj.id === p.id);
+                      setSelectedProject(projectToSelect || p);
+                    }}>
                       <div className="tree-dot" style={{ background: p.color }} />
                       <span className="tree-name">{p.name}</span>
                       <span className="tree-badge">{p.code}</span>
@@ -1932,7 +1937,8 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                ))}
+                );
+                })}
               </div>
             </div>
             {selectedProject && isTL && (
@@ -2081,12 +2087,24 @@ export default function App() {
       <div>
         <div className="section-header" style={{ marginBottom: 16 }}>
           <span className="section-title">{isTL ? "Meeting Pages" : "My Meetings"}</span>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             {showProjectFilter && (
-              <select className="form-select" value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{ width: 180, fontSize: 12 }}>
+              <select className="form-select" value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{ width: 140, fontSize: 12 }}>
                 {isTL && <option value="all">All projects</option>}
                 {collabProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+            )}
+            <select className="form-select" value={timeFilter} onChange={e => setTimeFilter(e.target.value)} style={{ width: 110, fontSize: 12 }}>
+              <option value="all">All time</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+              <option value="year">This year</option>
+            </select>
+            {timeFilter === "month" && (
+              <input className="form-input" type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{ width: 130, fontSize: 12 }} />
+            )}
+            {timeFilter === "year" && (
+              <input className="form-input" type="number" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} min="2020" max="2030" style={{ width: 90, fontSize: 12 }} />
             )}
             {isTL && <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>+ New Meeting</button>}
           </div>
