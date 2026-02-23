@@ -1824,11 +1824,26 @@ export default function App() {
 
   // ── PROJECTS & SCOPE ──
   function ProjectsTab() {
-    const [selectedProject, setSelectedProject] = useState(projects[0]);
+    const [selectedProject, setSelectedProject] = useState(null);
     const [projectModal, setProjectModal] = useState(null);
     const [subprojectInput, setSubprojectInput] = useState("");
     const [collabModal, setCollabModal] = useState(null);
     const [editSubproject, setEditSubproject] = useState(null);
+
+    // Sync selectedProject with projects array - keep selection if project still exists
+    useEffect(() => {
+      if (!selectedProject && projects.length > 0) {
+        setSelectedProject(projects[0]);
+      } else if (selectedProject && !projects.find(p => p.id === selectedProject.id)) {
+        setSelectedProject(projects[0] || null);
+      } else if (selectedProject) {
+        // Update selectedProject if it exists in the projects array to get latest data
+        const updatedProject = projects.find(p => p.id === selectedProject.id);
+        if (updatedProject && JSON.stringify(updatedProject) !== JSON.stringify(selectedProject)) {
+          setSelectedProject(updatedProject);
+        }
+      }
+    }, [projects]);
 
     function saveProject(form) {
       if (form.id) {
@@ -1851,8 +1866,7 @@ export default function App() {
       const sp = { id: genId(), name: subprojectInput.trim(), code: "", projectId: selectedProject.id, date_from: today(), date_to: "" };
       const updatedProjects = projects.map(p => p.id === selectedProject.id ? { ...p, subprojects: [...(p.subprojects || []), sp] } : p);
       setProjects(updatedProjects);
-      const updatedProject = updatedProjects.find(p => p.id === selectedProject.id);
-      setSelectedProject(updatedProject || selectedProject);
+      // Don't update selectedProject here - let useEffect handle it
       setSubprojectInput("");
     }
 
