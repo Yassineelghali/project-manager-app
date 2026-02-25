@@ -1096,7 +1096,7 @@ function AccountModal({ user, notifications, meetings, collaborators, onClose, o
             <div>
               <div className="account-stat-grid" style={{ marginBottom: 20 }}>
                 <div className="account-stat">
-                  <div className="account-stat-val">{meetings.length}</div>
+                  <div className="account-stat-val">{user.role === "TL" ? meetings.length : meetings.filter(m => m.sections?.[user.collabId]).length}</div>
                   <div className="account-stat-lbl">Meetings</div>
                 </div>
                 <div className="account-stat">
