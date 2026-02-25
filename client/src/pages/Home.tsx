@@ -1898,9 +1898,29 @@ export default function App() {
 
     function saveCollab(form) {
       if (form.id) {
-        setCollaborators(prev => prev.map(c => c.id === form.id ? { ...c, ...form } : c));
+        setCollaborators(prev => prev.map(c => {
+          if (c.id !== form.id) return c;
+          const oldSubprojectId = c.subprojectId;
+          const newChangeHistory = [...(c.changeHistory || [])];
+          if (oldSubprojectId !== form.subprojectId) {
+            newChangeHistory.push({
+              date: today(),
+              action: "changed",
+              oldSubprojectId: oldSubprojectId,
+              subprojectId: form.subprojectId,
+              timestamp: new Date().toLocaleTimeString("fr-FR")
+            });
+          }
+          return { ...c, ...form, changeHistory: newChangeHistory };
+        }));
       } else {
-        setCollaborators(prev => [...prev, { ...form, id: genId() }]);
+        const newChangeHistory = [{
+          date: today(),
+          action: "assigned",
+          subprojectId: form.subprojectId,
+          timestamp: new Date().toLocaleTimeString("fr-FR")
+        }];
+        setCollaborators(prev => [...prev, { ...form, id: genId(), changeHistory: newChangeHistory }]);
       }
       setCollabModal(null);
     }
@@ -2004,6 +2024,43 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Volatility Log */}
+          <div>
+            <div className="panel">
+              <div className="panel-head">
+                <span className="panel-title">Volatility Log</span>
+              </div>
+              <div className="scope-collab-list">
+                {collaborators.length === 0 ? (
+                  <div className="empty-state"><div className="empty-state-text">No changes recorded</div></div>
+                ) : (
+                  collaborators.map(c => {
+                    const changes = c.changeHistory || [];
+                    return changes.length > 0 ? (
+                      <div key={c.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <Avatar initials={c.initials} color={c.color || "#64B4DC"} size={28} />
+                          <span style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</span>
+                        </div>
+                        {changes.map((ch, idx) => {
+                          const oldSp = allSubprojects.find(s => s.id === ch.oldSubprojectId);
+                          const newSp = allSubprojects.find(s => s.id === ch.subprojectId);
+                          return (
+                            <div key={idx} style={{ fontSize: 11, color: "var(--text2)", marginLeft: 36, marginBottom: 4, fontFamily: "var(--mono)" }}>
+                              <span style={{ color: "var(--text3)" }}>{fmtDate(ch.date)} {ch.timestamp}</span>
+                              {ch.action === "assigned" && <span> — Assigned to <strong>{newSp?.name}</strong></span>}
+                              {ch.action === "changed" && <span> — Moved from <strong>{oldSp?.name}</strong> → <strong>{newSp?.name}</strong></span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null;
+                  })
+                )}
               </div>
             </div>
           </div>
