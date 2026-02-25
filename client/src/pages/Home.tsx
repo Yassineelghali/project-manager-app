@@ -1706,7 +1706,7 @@ export default function App() {
     const collab = collaborators.find(c => c.id === fromCollabId);
     const histEntry = { text: `Moved from <em>${SECTION_LABELS[fromSection]}</em> → <em>${SECTION_LABELS[toSection]}</em>`, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) };
     const updTask = { ...droppedTask, history: [...(droppedTask.history || []), histEntry] };
-    updateMeetingSection(meetingId, toCollabId, toSection, tasks => [...tasks, updTask]);
+    updateMeetingSection(meetingId, toCollabId, toSection, tasks => [updTask, ...tasks]);
     if (!isTL) addNotification(`<strong>${collab?.name}</strong> moved <em>${droppedTask.title}</em> to <em>${SECTION_LABELS[toSection]}</em>`, "↕");
   }
 
@@ -1883,6 +1883,19 @@ export default function App() {
       }
     }
 
+    function deleteCollaborator(collabId) {
+      const collab = collaborators.find(c => c.id === collabId);
+      if (confirm(`Êtes-vous sûr de vouloir supprimer ${collab?.name}?`)) {
+        setCollaborators(prev => prev.filter(x => x.id !== collabId));
+        setNotifications(prev => prev.filter(n => !n.text?.includes(`<strong>${collab?.name}</strong>`)));
+        setMeetings(prev => prev.map(m => {
+          const newSections = { ...m.sections };
+          delete newSections[collabId];
+          return { ...m, sections: newSections };
+        }));
+      }
+    }
+
     function saveCollab(form) {
       if (form.id) {
         setCollaborators(prev => prev.map(c => c.id === form.id ? { ...c, ...form } : c));
@@ -1985,7 +1998,7 @@ export default function App() {
                       {isTL && (
                         <div style={{ display: "flex", gap: 4 }}>
                           <button className="btn btn-ghost btn-xs" onClick={() => setCollabModal(c)}>✏</button>
-                          <button className="btn btn-danger btn-xs" onClick={() => setCollaborators(prev => prev.filter(x=>x.id!==c.id))}>✕</button>
+                          <button className="btn btn-danger btn-xs" onClick={() => deleteCollaborator(c.id)}>✕</button>
                         </div>
                       )}
                     </div>
