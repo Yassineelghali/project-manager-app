@@ -22,10 +22,10 @@ const INITIAL_PROJECTS = [
 ];
 
 const INITIAL_COLLABORATORS = [
-  { id: "c1", name: "Yassine Mansouri", initials: "YM", subprojectId: "sp1", date_from: "2024-01-01", date_to: "2025-12-31" },
-  { id: "c2", name: "Inès Boudali", initials: "IB", subprojectId: "sp2", date_from: "2024-03-01", date_to: "2025-12-31" },
-  { id: "c3", name: "Karim Sefrioui", initials: "KS", subprojectId: "sp3", date_from: "2025-01-01", date_to: "2026-06-30" },
-  { id: "c4", name: "Lina Ouhabi", initials: "LO", subprojectId: "sp4", date_from: "2025-01-01", date_to: "2026-06-30" },
+  { id: "c1", name: "Yassine Mansouri", initials: "YM", subprojectId: "sp1", date_from: "2024-01-01", date_to: "2025-12-31", changeHistory: [{ date: "2024-01-01", action: "assigned", subprojectId: "sp1" }] },
+  { id: "c2", name: "Inès Boudali", initials: "IB", subprojectId: "sp2", date_from: "2024-03-01", date_to: "2025-12-31", changeHistory: [{ date: "2024-03-01", action: "assigned", subprojectId: "sp2" }] },
+  { id: "c3", name: "Karim Sefrioui", initials: "KS", subprojectId: "sp3", date_from: "2025-01-01", date_to: "2026-06-30", changeHistory: [{ date: "2025-01-01", action: "assigned", subprojectId: "sp3" }] },
+  { id: "c4", name: "Lina Ouhabi", initials: "LO", subprojectId: "sp4", date_from: "2025-01-01", date_to: "2026-06-30", changeHistory: [{ date: "2025-01-01", action: "assigned", subprojectId: "sp4" }] },
 ];
 
 const INITIAL_MEETINGS = [
