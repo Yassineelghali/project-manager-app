@@ -1,0 +1,4 @@
+- [x] Implement invitation token generation and storage
+- [x] Create invitation verification logic
+- [x] Build invitation acceptance page with auto-assignment
+- [x] Test complete invitation workflow

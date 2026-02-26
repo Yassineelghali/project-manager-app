@@ -690,6 +690,38 @@ const css = `
   .activity-time { margin-left: auto; font-size: 10px; font-family: var(--mono); color: var(--text3); }
 `;
 
+// ─── INVITATION TOKENS (mock) ──────────────────────────────────────────────
+
+const INVITATION_TOKENS = {}; // { token: { email, subprojectId, tlId, createdAt, acceptedAt } }
+
+function generateInvitationToken() {
+  return Math.random().toString(36).slice(2, 15) + Math.random().toString(36).slice(2, 15);
+}
+
+function createInvitationToken(email, subprojectId, tlId) {
+  const token = generateInvitationToken();
+  INVITATION_TOKENS[token] = {
+    email,
+    subprojectId,
+    tlId,
+    createdAt: new Date().toISOString(),
+    acceptedAt: null
+  };
+  return token;
+}
+
+function getInvitationByToken(token) {
+  return INVITATION_TOKENS[token] || null;
+}
+
+function acceptInvitation(token) {
+  if (INVITATION_TOKENS[token]) {
+    INVITATION_TOKENS[token].acceptedAt = new Date().toISOString();
+    return true;
+  }
+  return false;
+}
+
 // ─── USERS DATABASE (mock) ───────────────────────────────────────────────────
 
 const USERS_DB = [
@@ -711,11 +743,29 @@ function LoginScreen({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   
+  // Check for invitation token in URL
+  const [invitationData, setInvitationData] = useState(null);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('invite');
+    if (token) {
+      const invitation = getInvitationByToken(token);
+      if (invitation && !invitation.acceptedAt) {
+        setInvitationData({ token, ...invitation });
+        setEmail(invitation.email);
+        setMode("signup");
+      } else {
+        setError("Le lien d'invitation est invalide ou a déjà été utilisé");
+      }
+    }
+  }, []);
+  
   // Signup fields
-  const [signupForm, setSignupForm] = useState({
-    name: "", email: "", password: "", confirmPassword: "",
+  const [signupForm, setSignupForm] = useState(() => ({
+    name: "", email: invitationData?.email || "", password: "", confirmPassword: "",
     role: "Collaborator", department: "", team: "", color: "#64B4DC"
-  });
+  }));
 
   function handleLogin(e) {
     e && e.preventDefault();
@@ -765,9 +815,16 @@ function LoginScreen({ onLogin }) {
         department: signupForm.department || "General",
         team: signupForm.team,
         joinDate: today(),
-        collabId: signupForm.role === "Collaborator" ? genId() : null
+        collabId: signupForm.role === "Collaborator" ? genId() : null,
+        invitationToken: invitationData?.token || null
       };
       USERS_DB.push(newUser);
+      
+      // If user was invited, accept the invitation
+      if (invitationData?.token) {
+        acceptInvitation(invitationData.token);
+      }
+      
       onLogin(newUser);
       setLoading(false);
     }, 600);
@@ -797,6 +854,13 @@ function LoginScreen({ onLogin }) {
 
         <div className="login-title">{mode === "login" ? "Connexion" : "Créer un compte"}</div>
         <div className="login-subtitle">{mode === "login" ? "Accédez à votre espace de suivi hebdomadaire" : "Rejoignez votre équipe AVL"}</div>
+
+        {invitationData && mode === "signup" && (
+          <div style={{ background: "rgba(0,168,204,0.12)", border: "1px solid rgba(0,168,204,0.3)", padding: 12, borderRadius: 4, marginBottom: 16, fontSize: 12 }}>
+            <div style={{ color: "var(--accent)", fontWeight: 500, marginBottom: 4 }}>✓ Invitation détectée</div>
+            <div style={{ color: "var(--text2)", fontSize: 11 }}>Vous êtes invité à rejoindre un projet. Créez votre compte pour accéder automatiquement.</div>
+          </div>
+        )}
 
         {error && (
           <div className="login-error">
@@ -880,7 +944,7 @@ function LoginScreen({ onLogin }) {
             </div>
             <div className="form-group">
               <label className="form-label">Email *</label>
-              <input className="form-input" type="email" value={signupForm.email} onChange={e => setSignupForm(f => ({ ...f, email: e.target.value }))} placeholder="jean.dupont@avl.com" />
+              <input className="form-input" type="email" value={signupForm.email} onChange={e => !invitationData && setSignupForm(f => ({ ...f, email: e.target.value }))} placeholder="jean.dupont@avl.com" disabled={invitationData ? true : false} />
             </div>
             <div className="form-group">
               <label className="form-label">Département *</label>
@@ -1587,13 +1651,60 @@ export default function App() {
   const unreadCount = notifications.filter(n => !n.read).length;
   const userColor = loggedInUser?.color || "#00A8CC";
 
-  function handleLogin(user) { setLoggedInUser(user); setView("dashboard"); }
+  function handleLogin(user) {
+    setLoggedInUser(user);
+    setView("dashboard");
+    // Clean up invitation token from URL
+    if (window.location.search.includes('invite=')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
   function handleLogout() { setLoggedInUser(null); setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false); }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
     const newInitials = form.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
     setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
+
+  // ── Initialize data on login ──
+  useEffect(() => {
+    if (!loggedInUser) return;
+    
+    if (loggedInUser.role === "TL") {
+      // TL: Load their projects and collaborators
+      const tlKey = `tl_data_${loggedInUser.id}`;
+      const savedData = localStorage.getItem(tlKey);
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        setProjects(data.projects || []);
+        setCollaborators(data.collaborators || []);
+        setMeetings(data.meetings || []);
+      }
+    } else {
+      // Collaborator: Load only their assigned projects
+      const collabKey = `collab_data_${loggedInUser.collabId}`;
+      const savedData = localStorage.getItem(collabKey);
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        setProjects(data.projects || []);
+        setCollaborators(data.collaborators || []);
+        setMeetings(data.meetings || []);
+      }
+    }
+  }, [loggedInUser]);
+
+  // ── Persist data to localStorage whenever it changes ──
+  useEffect(() => {
+    if (!loggedInUser) return;
+    
+    if (loggedInUser.role === "TL") {
+      const tlKey = `tl_data_${loggedInUser.id}`;
+      localStorage.setItem(tlKey, JSON.stringify({ projects, collaborators, meetings }));
+    } else {
+      const collabKey = `collab_data_${loggedInUser.collabId}`;
+      localStorage.setItem(collabKey, JSON.stringify({ projects, collaborators, meetings }));
+    }
+  }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
@@ -1920,7 +2031,8 @@ export default function App() {
           subprojectId: form.subprojectId,
           timestamp: new Date().toLocaleTimeString("fr-FR")
         }];
-        setCollaborators(prev => [...prev, { ...form, id: genId(), changeHistory: newChangeHistory }]);
+        const newCollab = { ...form, id: genId(), changeHistory: newChangeHistory, invitationToken: null };
+        setCollaborators(prev => [...prev, newCollab]);
       }
       setCollabModal(null);
     }
@@ -2077,7 +2189,14 @@ export default function App() {
                 ) : (
                   collaborators.filter(c => c.email).map(c => {
                     const sp = allSubprojects.find(s => s.id === c.subprojectId);
-                    const inviteLink = `${window.location.origin}?invite=${btoa(JSON.stringify({ email: c.email, subprojectId: c.subprojectId, name: c.name }))}`;
+                    // Generate or retrieve token for this collaborator
+                    let token = c.invitationToken;
+                    if (!token) {
+                      token = createInvitationToken(c.email, c.subprojectId, loggedInUser.id);
+                      // Update collaborator with token
+                      setCollaborators(prev => prev.map(col => col.id === c.id ? { ...col, invitationToken: token } : col));
+                    }
+                    const inviteLink = `${window.location.origin}?invite=${token}`;
                     return (
                       <div key={c.id} style={{ padding: 12, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                         <div>
