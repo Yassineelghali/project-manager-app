@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 
-const INITIAL_PROJECTS = [
+const DEMO_PROJECTS = [
   {
     id: "p1", name: "Powertrain ECU", code: "ECU-24", color: "#00A8CC",
     date_from: "2024-01-01", date_to: "2025-12-31",
@@ -1566,14 +1566,10 @@ export default function App() {
 
   // ── APP STATE (all hooks must be declared before any conditional return) ──
   const [view, setView] = useState("dashboard");
-  const [projects, setProjects] = useState(INITIAL_PROJECTS);
-  const [collaborators, setCollaborators] = useState(INITIAL_COLLABORATORS);
-  const [meetings, setMeetings] = useState(INITIAL_MEETINGS);
-  const [notifications, setNotifications] = useState([
-    { id: "n1", text: "<strong>Yassine Mansouri</strong> changed status of <em>DGO torque arbitration</em> from <strong>Open → Ongoing</strong>", time: "5m ago", read: false, icon: "↔" },
-    { id: "n2", text: "<strong>Inès Boudali</strong> updated description of <em>Lambda correction model</em>", time: "1h ago", read: false, icon: "✏" },
-    { id: "n3", text: "<strong>Karim Sefrioui</strong> moved <em>Sensor calibration</em> to <em>Upcoming Tasks</em>", time: "2h ago", read: true, icon: "↕" },
-  ]);
+  const [projects, setProjects] = useState([]);
+  const [collaborators, setCollaborators] = useState([]);
+  const [meetings, setMeetings] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [selectedMeetingId, setSelectedMeetingId] = useState(null);
   const [meetingViewProject, setMeetingViewProject] = useState(null);
   const [modal, setModal] = useState(null);
