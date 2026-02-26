@@ -1491,7 +1491,7 @@ function SubprojectFormModal({ subproject, onSave, onClose }) {
 
 // ── COLLABORATOR FORM MODAL ──
 function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
-  const [form, setForm] = useState(collab || { name: "", initials: "", subprojectId: subprojects[0]?.id || "", date_from: today(), date_to: "" });
+  const [form, setForm] = useState(collab || { name: "", initials: "", email: "", subprojectId: subprojects[0]?.id || "", date_from: today(), date_to: "" });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1510,6 +1510,10 @@ function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
               <label className="form-label">Initials</label>
               <input className="form-input" value={form.initials} onChange={e => set("initials", e.target.value)} maxLength={2} placeholder="JD" />
             </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Email (for invitation)</label>
+            <input className="form-input" type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="jean.dupont@avl.com" />
           </div>
           <div className="form-group">
             <label className="form-label">Sub-project *</label>
@@ -2060,6 +2064,35 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* Invitations */}
+          <div>
+            <div className="panel">
+              <div className="panel-head">
+                <span className="panel-title">Invitations</span>
+              </div>
+              <div className="scope-collab-list">
+                {collaborators.filter(c => c.email).length === 0 ? (
+                  <div className="empty-state"><div className="empty-state-text">No pending invitations</div></div>
+                ) : (
+                  collaborators.filter(c => c.email).map(c => {
+                    const sp = allSubprojects.find(s => s.id === c.subprojectId);
+                    const inviteLink = `${window.location.origin}?invite=${btoa(JSON.stringify({ email: c.email, subprojectId: c.subprojectId, name: c.name }))}`;
+                    return (
+                      <div key={c.id} style={{ padding: 12, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
+                          <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{c.email}</div>
+                          <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>→ {sp?.name}</div>
+                        </div>
+                        <button className="btn btn-ghost btn-xs" onClick={() => { navigator.clipboard.writeText(inviteLink); alert("Invitation link copied!"); }}>📋 Copy Link</button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {projectModal !== null && (
@@ -2242,11 +2275,21 @@ export default function App() {
       ? getCollabsForProject(meeting.projectId)
       : collaborators.filter(c => c.id === collabUserId);
 
+    const isArchivedMeeting = !isTL && (() => {
+      const collab = collaborators.find(c => c.id === collabUserId);
+      if (!collab || !collab.changeHistory || collab.changeHistory.length === 0) return false;
+      const changes = collab.changeHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const firstChange = changes[0];
+      return meeting.date < firstChange.date;
+    })();
+
     function openAddTask(collabId, sectionKey) {
+      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task: { title: "", description: "", status: "Open", deadline: "" } });
     }
 
     function openEditTask(task, collabId, sectionKey) {
+      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task });
     }
 
