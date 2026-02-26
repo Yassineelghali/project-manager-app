@@ -692,7 +692,29 @@ const css = `
 
 // ─── INVITATION TOKENS (mock) ──────────────────────────────────────────────
 
-const INVITATION_TOKENS = {}; // { token: { email, subprojectId, tlId, createdAt, acceptedAt } }
+let INVITATION_TOKENS = {};
+
+// Load tokens from localStorage on startup
+function initializeInvitationTokens() {
+  try {
+    const stored = localStorage.getItem('invitation_tokens');
+    if (stored) {
+      INVITATION_TOKENS = JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load invitation tokens:', e);
+    INVITATION_TOKENS = {};
+  }
+}
+
+// Save tokens to localStorage
+function persistInvitationTokens() {
+  try {
+    localStorage.setItem('invitation_tokens', JSON.stringify(INVITATION_TOKENS));
+  } catch (e) {
+    console.error('Failed to save invitation tokens:', e);
+  }
+}
 
 function generateInvitationToken() {
   return Math.random().toString(36).slice(2, 15) + Math.random().toString(36).slice(2, 15);
@@ -707,6 +729,7 @@ function createInvitationToken(email, subprojectId, tlId) {
     createdAt: new Date().toISOString(),
     acceptedAt: null
   };
+  persistInvitationTokens(); // Save to localStorage
   return token;
 }
 
@@ -717,10 +740,14 @@ function getInvitationByToken(token) {
 function acceptInvitation(token) {
   if (INVITATION_TOKENS[token]) {
     INVITATION_TOKENS[token].acceptedAt = new Date().toISOString();
+    persistInvitationTokens(); // Save to localStorage
     return true;
   }
   return false;
 }
+
+// Initialize tokens on page load
+initializeInvitationTokens();
 
 // ─── USERS DATABASE (mock) ───────────────────────────────────────────────────
 
@@ -747,6 +774,9 @@ function LoginScreen({ onLogin }) {
   const [invitationData, setInvitationData] = useState(null);
   
   useEffect(() => {
+    // Reload tokens from localStorage to ensure we have the latest
+    initializeInvitationTokens();
+    
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
     if (token) {
@@ -755,8 +785,10 @@ function LoginScreen({ onLogin }) {
         setInvitationData({ token, ...invitation });
         setEmail(invitation.email);
         setMode("signup");
+      } else if (invitation && invitation.acceptedAt) {
+        setError("Ce lien d'invitation a déjà été utilisé. Veuillez vous connecter avec votre compte.");
       } else {
-        setError("Le lien d'invitation est invalide ou a déjà été utilisé");
+        setError("Le lien d'invitation est invalide. Veuillez demander un nouveau lien au Team Leader.");
       }
     }
   }, []);
@@ -822,7 +854,8 @@ function LoginScreen({ onLogin }) {
       
       // If user was invited, accept the invitation
       if (invitationData?.token) {
-        acceptInvitation(invitationData.token);
+        const result = acceptInvitation(invitationData.token);
+        console.log('Invitation accepted:', result);
       }
       
       onLogin(newUser);
