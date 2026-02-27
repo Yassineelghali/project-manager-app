@@ -794,10 +794,17 @@ function LoginScreen({ onLogin }) {
   }, []);
   
   // Signup fields
-  const [signupForm, setSignupForm] = useState(() => ({
-    name: "", email: invitationData?.email || "", password: "", confirmPassword: "",
+  const [signupForm, setSignupForm] = useState({
+    name: "", email: "", password: "", confirmPassword: "",
     role: "Collaborator", department: "", team: "", color: "#64B4DC"
-  }));
+  });
+  
+  // Update email when invitationData changes
+  useEffect(() => {
+    if (invitationData?.email) {
+      setSignupForm(f => ({ ...f, email: invitationData.email }));
+    }
+  }, [invitationData]);
 
   function handleLogin(e) {
     e && e.preventDefault();
@@ -864,6 +871,17 @@ function LoginScreen({ onLogin }) {
       
       // Log for debugging
       console.log('New user created:', { name: newUser.name, email: newUser.email, invitationToken: newUser.invitationToken });
+      
+      // If invited, share TL's data with collaborator
+      if (invitationData?.tlId) {
+        const tlKey = `tl_data_${invitationData.tlId}`;
+        const tlData = localStorage.getItem(tlKey);
+        if (tlData) {
+          const collabKey = `collab_data_${newUser.collabId}`;
+          localStorage.setItem(collabKey, tlData);
+          console.log('Shared TL data with collaborator');
+        }
+      }
       
       onLogin(newUser);
       setLoading(false);
@@ -993,6 +1011,11 @@ function LoginScreen({ onLogin }) {
                 disabled={invitationData ? true : false}
                 style={invitationData ? { opacity: 0.7, backgroundColor: "rgba(0,168,204,0.08)" } : {}}
               />
+              {invitationData && signupForm.email && (
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4, fontFamily: "var(--mono)" }}>
+                  📧 Vous utiliserez cet email pour vous connecter: <strong>{signupForm.email}</strong>
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Département *</label>
@@ -1745,17 +1768,30 @@ export default function App() {
   useEffect(() => {
     if (!loggedInUser) return;
     
+    const dataToSave = { projects, collaborators, meetings };
+    
     if (loggedInUser.role === "TL") {
       const tlKey = `tl_data_${loggedInUser.id}`;
-      localStorage.setItem(tlKey, JSON.stringify({ projects, collaborators, meetings }));
+      localStorage.setItem(tlKey, JSON.stringify(dataToSave));
+      // Share TL data with all invited collaborators
+      collaborators.forEach(collab => {
+        if (collab.invitationToken) {
+          const collabUser = USERS_DB.find(u => u.invitationToken === collab.invitationToken && u.role === "Collaborator");
+          if (collabUser) {
+            const collabKey = `collab_data_${collabUser.collabId}`;
+            localStorage.setItem(collabKey, JSON.stringify(dataToSave));
+          }
+        }
+      });
     } else {
       const collabKey = `collab_data_${loggedInUser.collabId}`;
-      localStorage.setItem(collabKey, JSON.stringify({ projects, collaborators, meetings }));
+      localStorage.setItem(collabKey, JSON.stringify(dataToSave));
     }
   }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
+
 
   // ── Helpers ──
   const allSubprojects = projects.flatMap(p => p.subprojects || []);

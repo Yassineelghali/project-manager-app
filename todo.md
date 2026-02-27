@@ -12,3 +12,7 @@
 - [x] Fix: Ensure invitation email is saved to USERS_DB when creating account
 - [x] Fix: Login must find users by invitation email
 - [x] Test: Invited user can login after logout (25 tests passing)
+- [x] Debug: Email persistence fixed with useEffect
+- [x] Display collaborator email under signup form during invitation
+- [x] Sync meeting pages from TL to collaborator view
+- [x] Test: Collaborator can see TL's meeting pages (20 tests passing)
