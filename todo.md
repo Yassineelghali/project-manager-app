@@ -5,3 +5,7 @@
 - [x] Fix token persistence in localStorage
 - [x] Add localStorage initialization on page load
 - [x] Test persistence with 13 comprehensive tests (all passing)
+- [x] Fix email field validation for invited users (exclude from required check)
+- [x] Make email field read-only but pre-filled for invited users
+- [x] Add visual indicator for auto-filled email field
+- [x] Test email validation with 13 comprehensive tests (all passing)

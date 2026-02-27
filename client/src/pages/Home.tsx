@@ -816,7 +816,9 @@ function LoginScreen({ onLogin }) {
     setError("");
     
     // Validation
-    if (!signupForm.name || !signupForm.email || !signupForm.password || !signupForm.team) {
+    // If invited, email is auto-filled so skip email validation
+    const emailRequired = !invitationData;
+    if (!signupForm.name || (emailRequired && !signupForm.email) || !signupForm.password || !signupForm.team) {
       setError("Tous les champs obligatoires doivent être remplis");
       return;
     }
@@ -976,8 +978,16 @@ function LoginScreen({ onLogin }) {
               <input className="form-input" value={signupForm.name} onChange={e => setSignupForm(f => ({ ...f, name: e.target.value }))} placeholder="Jean Dupont" />
             </div>
             <div className="form-group">
-              <label className="form-label">Email *</label>
-              <input className="form-input" type="email" value={signupForm.email} onChange={e => !invitationData && setSignupForm(f => ({ ...f, email: e.target.value }))} placeholder="jean.dupont@avl.com" disabled={invitationData ? true : false} />
+              <label className="form-label">Email {invitationData ? "(auto-rempli)" : "*"}</label>
+              <input 
+                className="form-input" 
+                type="email" 
+                value={signupForm.email} 
+                onChange={e => !invitationData && setSignupForm(f => ({ ...f, email: e.target.value }))} 
+                placeholder="jean.dupont@avl.com" 
+                disabled={invitationData ? true : false}
+                style={invitationData ? { opacity: 0.7, backgroundColor: "rgba(0,168,204,0.08)" } : {}}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Département *</label>
