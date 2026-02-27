@@ -9,3 +9,6 @@
 - [x] Make email field read-only but pre-filled for invited users
 - [x] Add visual indicator for auto-filled email field
 - [x] Test email validation with 13 comprehensive tests (all passing)
+- [x] Fix: Ensure invitation email is saved to USERS_DB when creating account
+- [x] Fix: Login must find users by invitation email
+- [x] Test: Invited user can login after logout (25 tests passing)

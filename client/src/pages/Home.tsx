@@ -838,11 +838,13 @@ function LoginScreen({ onLogin }) {
     setLoading(true);
     setTimeout(() => {
       const initials = signupForm.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+      // Use invitation email if signup email is empty (for invited users)
+      const userEmail = signupForm.email || invitationData?.email || "";
       const newUser = {
         id: genId(),
         name: signupForm.name,
         initials,
-        email: signupForm.email,
+        email: userEmail,
         password: signupForm.password,
         role: signupForm.role,
         color: signupForm.color,
@@ -859,6 +861,9 @@ function LoginScreen({ onLogin }) {
         const result = acceptInvitation(invitationData.token);
         console.log('Invitation accepted:', result);
       }
+      
+      // Log for debugging
+      console.log('New user created:', { name: newUser.name, email: newUser.email, invitationToken: newUser.invitationToken });
       
       onLogin(newUser);
       setLoading(false);
