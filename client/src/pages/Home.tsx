@@ -690,29 +690,43 @@ const css = `
   .activity-time { margin-left: auto; font-size: 10px; font-family: var(--mono); color: var(--text3); }
 `;
 
-// ─── INVITATION TOKENS (mock) ──────────────────────────────────────────────
+// ─── INVITATION TOKENS (global persistent) ──────────────────────────────────
 
-let INVITATION_TOKENS = {};
+// Global object that persists across page reloads (stored in window)
+if (!window.__INVITATION_TOKENS__) {
+  window.__INVITATION_TOKENS__ = {};
+}
 
-// Load tokens from localStorage on startup
+let INVITATION_TOKENS = window.__INVITATION_TOKENS__;
+
+// Load tokens from localStorage on startup (fallback)
 function initializeInvitationTokens() {
   try {
     const stored = localStorage.getItem('invitation_tokens');
     if (stored) {
-      INVITATION_TOKENS = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Merge with existing tokens
+      INVITATION_TOKENS = { ...parsed, ...window.__INVITATION_TOKENS__ };
+      window.__INVITATION_TOKENS__ = INVITATION_TOKENS;
+      console.log('Loaded invitation tokens from localStorage:', Object.keys(INVITATION_TOKENS).length);
     }
   } catch (e) {
     console.error('Failed to load invitation tokens:', e);
-    INVITATION_TOKENS = {};
   }
 }
 
-// Save tokens to localStorage
+// Save tokens to localStorage AND window object
 function persistInvitationTokens() {
   try {
+    // Always update the global window object
+    window.__INVITATION_TOKENS__ = INVITATION_TOKENS;
+    // Also try to save to localStorage (may fail in private mode)
     localStorage.setItem('invitation_tokens', JSON.stringify(INVITATION_TOKENS));
+    console.log('Persisted invitation tokens:', Object.keys(INVITATION_TOKENS).length);
   } catch (e) {
-    console.error('Failed to save invitation tokens:', e);
+    console.error('Failed to save invitation tokens to localStorage (private mode?):', e);
+    // Still update window object even if localStorage fails
+    window.__INVITATION_TOKENS__ = INVITATION_TOKENS;
   }
 }
 
@@ -734,7 +748,11 @@ function createInvitationToken(email, subprojectId, tlId) {
 }
 
 function getInvitationByToken(token) {
-  return INVITATION_TOKENS[token] || null;
+  // Always check the global window object first
+  const tokens = window.__INVITATION_TOKENS__ || INVITATION_TOKENS;
+  const invitation = tokens[token];
+  console.log('Getting invitation for token:', token, 'found:', !!invitation);
+  return invitation || null;
 }
 
 function acceptInvitation(token) {
@@ -811,6 +829,8 @@ function LoginScreen({ onLogin }) {
     setError("");
     setLoading(true);
     setTimeout(() => {
+      console.log('Login attempt:', { email, password });
+      console.log('USERS_DB:', USERS_DB.map(u => ({ name: u.name, email: u.email })));
       const user = USERS_DB.find(u => u.email === email && u.password === password);
       if (user) { onLogin(user); }
       else { setError("Identifiants incorrects. Vérifiez votre email et mot de passe."); }
@@ -845,8 +865,9 @@ function LoginScreen({ onLogin }) {
     setLoading(true);
     setTimeout(() => {
       const initials = signupForm.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-      // Use invitation email if signup email is empty (for invited users)
-      const userEmail = signupForm.email || invitationData?.email || "";
+      // Email should always be in signupForm thanks to useEffect
+      const userEmail = signupForm.email;
+      console.log('Signup debug:', { signupFormEmail: signupForm.email, invitationEmail: invitationData?.email, finalEmail: userEmail });
       const newUser = {
         id: genId(),
         name: signupForm.name,
@@ -871,6 +892,7 @@ function LoginScreen({ onLogin }) {
       
       // Log for debugging
       console.log('New user created:', { name: newUser.name, email: newUser.email, invitationToken: newUser.invitationToken });
+      console.log('USERS_DB after signup:', USERS_DB.map(u => ({ id: u.id, name: u.name, email: u.email })));
       
       // If invited, share TL's data with collaborator
       if (invitationData?.tlId) {
