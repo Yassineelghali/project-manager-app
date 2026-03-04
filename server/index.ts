@@ -2,6 +2,8 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import invitationsRouter from "./invitations.js";
+import usersRouter from "./users.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,9 +18,16 @@ async function startServer() {
       ? path.resolve(__dirname, "public")
       : path.resolve(__dirname, "..", "dist", "public");
 
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  
+  // API routes
+  app.use(invitationsRouter);
+  app.use(usersRouter);
+  
   app.use(express.static(staticPath));
 
-  // Handle client-side routing - serve index.html for all routes
+  // Handle client-side routing - serve index.html for all routes (must be after API routes)
   app.get("*", (_req, res) => {
     res.sendFile(path.join(staticPath, "index.html"));
   });
