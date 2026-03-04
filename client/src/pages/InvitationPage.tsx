@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { signUp } from '@/lib/supabaseAuth';
 
 export default function InvitationPage() {
   const [invitation, setInvitation] = useState<any>(null);
@@ -74,28 +75,30 @@ export default function InvitationPage() {
       const params = new URLSearchParams(window.location.search);
       const token = params.get('invite');
 
-      // Create user account
-      const createResponse = await fetch('/api/users/create-from-invitation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          name: formData.name,
-          password: formData.password,
-          department: formData.department,
-          team: formData.team
-        })
+      // Sign up with Supabase Auth
+      const signUpResult = await signUp(invitation.email, formData.password, {
+        name: formData.name,
+        department: formData.department,
+        team: formData.team
       });
 
-      if (!createResponse.ok) {
-        const errorData = await createResponse.json();
-        setError(errorData.error || 'Erreur lors de la création du compte');
+      if (!signUpResult.success) {
+        setError(signUpResult.error || 'Erreur lors de la création du compte');
         setSubmitting(false);
         return;
       }
 
-      const result = await createResponse.json();
-      alert(`Compte créé avec succès! Email: ${result.email}\n\nVous pouvez maintenant vous connecter.`);
+      // Mark invitation as accepted
+      const acceptResponse = await fetch(`/api/invitations/${token}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!acceptResponse.ok) {
+        console.warn('Failed to mark invitation as accepted');
+      }
+
+      alert(`Compte créé avec succès! Email: ${invitation.email}\n\nVous pouvez maintenant vous connecter.`);
       window.location.href = '/';
     } catch (err) {
       console.error('Error:', err);
