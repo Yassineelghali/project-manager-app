@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { signIn, signUp, getCurrentUser, supabase } from "@/lib/supabaseAuth";
+import { createInvitationToken as createSupabaseInvite, getInvitationByToken as getSupabaseInvite, acceptInvitation as acceptSupabaseInvite } from "@/lib/invitationService";
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 
@@ -792,23 +794,28 @@ function LoginScreen({ onLogin }) {
   const [invitationData, setInvitationData] = useState(null);
   
   useEffect(() => {
-    // Reload tokens from localStorage to ensure we have the latest
-    initializeInvitationTokens();
-    
     const params = new URLSearchParams(window.location.search);
     const token = params.get('invite');
-    if (token) {
-      const invitation = getInvitationByToken(token);
-      if (invitation && !invitation.acceptedAt) {
-        setInvitationData({ token, ...invitation });
-        setEmail(invitation.email);
-        setMode("signup");
-      } else if (invitation && invitation.acceptedAt) {
-        setError("Ce lien d'invitation a déjà été utilisé. Veuillez vous connecter avec votre compte.");
-      } else {
-        setError("Le lien d'invitation est invalide. Veuillez demander un nouveau lien au Team Leader.");
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/invitations/${token}`);
+        if (!res.ok) {
+          setError("Le lien d'invitation est invalide. Veuillez demander un nouveau lien au Team Leader.");
+          return;
+        }
+        const invitation = await res.json();
+        if (invitation.acceptedAt) {
+          setError("Ce lien d'invitation a déjà été utilisé. Veuillez vous connecter avec votre compte.");
+        } else {
+          setInvitationData({ token, ...invitation });
+          setEmail(invitation.email);
+          setMode("signup");
+        }
+      } catch {
+        setError("Erreur lors de la vérification de l'invitation.");
       }
-    }
+    })();
   }, []);
   
   // Signup fields
@@ -828,22 +835,38 @@ function LoginScreen({ onLogin }) {
     e && e.preventDefault();
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      console.log('Login attempt:', { email, password });
-      console.log('USERS_DB:', USERS_DB.map(u => ({ name: u.name, email: u.email })));
-      const user = USERS_DB.find(u => u.email === email && u.password === password);
-      if (user) { onLogin(user); }
-      else { setError("Identifiants incorrects. Vérifiez votre email et mot de passe."); }
+    (async () => {
+      // 1. Authenticate via Supabase Auth
+      const authResult = await signIn(email, password);
+      if (!authResult.success) {
+        // Fallback: try local USERS_DB for demo accounts
+        const demoUser = USERS_DB.find(u => u.email === email && u.password === password);
+        if (demoUser) { onLogin(demoUser); setLoading(false); return; }
+        setError("Identifiants incorrects. Vérifiez votre email et mot de passe.");
+        setLoading(false);
+        return;
+      }
+      // 2. Fetch full user profile from 'users' table
+      const { data: profile } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+      if (profile) {
+        onLogin({ ...profile, initials: profile.name?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2) });
+      } else {
+        // Supabase Auth ok but no profile row yet — use auth user info
+        onLogin({ id: authResult.user?.id, email, name: email, role: 'Collaborator', initials: email[0].toUpperCase(), collabId: authResult.user?.id });
+      }
       setLoading(false);
-    }, 600);
+    })();
   }
 
   function handleSignup(e) {
     e && e.preventDefault();
     setError("");
-    
+
     // Validation
-    // If invited, email is auto-filled so skip email validation
     const emailRequired = !invitationData;
     if (!signupForm.name || (emailRequired && !signupForm.email) || !signupForm.password || !signupForm.team) {
       setError("Tous les champs obligatoires doivent être remplis");
@@ -857,57 +880,90 @@ function LoginScreen({ onLogin }) {
       setError("Le mot de passe doit contenir au moins 6 caractères");
       return;
     }
-    if (USERS_DB.find(u => u.email === signupForm.email)) {
-      setError("Cet email est déjà utilisé");
-      return;
-    }
 
     setLoading(true);
-    setTimeout(() => {
-      const initials = signupForm.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-      // Email should always be in signupForm thanks to useEffect
-      const userEmail = signupForm.email;
-      console.log('Signup debug:', { signupFormEmail: signupForm.email, invitationEmail: invitationData?.email, finalEmail: userEmail });
-      const newUser = {
-        id: genId(),
-        name: signupForm.name,
-        initials,
-        email: userEmail,
-        password: signupForm.password,
-        role: signupForm.role,
-        color: signupForm.color,
-        department: signupForm.department || "General",
-        team: signupForm.team,
-        joinDate: today(),
-        collabId: signupForm.role === "Collaborator" ? genId() : null,
-        invitationToken: invitationData?.token || null
-      };
-      USERS_DB.push(newUser);
-      
-      // If user was invited, accept the invitation
-      if (invitationData?.token) {
-        const result = acceptInvitation(invitationData.token);
-        console.log('Invitation accepted:', result);
-      }
-      
-      // Log for debugging
-      console.log('New user created:', { name: newUser.name, email: newUser.email, invitationToken: newUser.invitationToken });
-      console.log('USERS_DB after signup:', USERS_DB.map(u => ({ id: u.id, name: u.name, email: u.email })));
-      
-      // If invited, share TL's data with collaborator
-      if (invitationData?.tlId) {
-        const tlKey = `tl_data_${invitationData.tlId}`;
-        const tlData = localStorage.getItem(tlKey);
-        if (tlData) {
-          const collabKey = `collab_data_${newUser.collabId}`;
-          localStorage.setItem(collabKey, tlData);
-          console.log('Shared TL data with collaborator');
+    (async () => {
+      try {
+        const userEmail = invitationData?.email || signupForm.email;
+        const initials = signupForm.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+
+        if (invitationData?.token) {
+          // ── Path A: Collaborator invited by TL ──
+          // Use the server endpoint that links the user to the TL & subproject
+          const res = await fetch('/api/users/create-from-invitation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: invitationData.token,
+              name: signupForm.name,
+              password: signupForm.password,
+              department: signupForm.department,
+              team: signupForm.team
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) { setError(data.error || "Erreur lors de la création du compte"); setLoading(false); return; }
+
+          // Also register in Supabase Auth so signIn works later
+          await signUp(userEmail, signupForm.password, { name: signupForm.name });
+
+          const newUser = {
+            id: data.userId,
+            name: signupForm.name,
+            initials,
+            email: userEmail,
+            role: 'Collaborator',
+            color: signupForm.color || "#64B4DC",
+            department: signupForm.department || "General",
+            team: signupForm.team,
+            joinDate: today(),
+            collabId: data.collabId,
+            tlId: data.tlId,
+            subprojectId: data.subprojectId
+          };
+          onLogin(newUser);
+
+        } else {
+          // ── Path B: TL self-signup ──
+          const authResult = await signUp(userEmail, signupForm.password, { name: signupForm.name });
+          if (!authResult.success) { setError(authResult.error || "Erreur lors de la création du compte"); setLoading(false); return; }
+
+          const res = await fetch('/api/users/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: signupForm.name,
+              email: userEmail,
+              password: signupForm.password,
+              role: signupForm.role,
+              department: signupForm.department,
+              team: signupForm.team
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) { setError(data.error || "Erreur lors de la création du compte"); setLoading(false); return; }
+
+          const newUser = {
+            id: data.userId,
+            name: signupForm.name,
+            initials,
+            email: userEmail,
+            role: signupForm.role,
+            color: signupForm.color || "#00A8CC",
+            department: signupForm.department || "General",
+            team: signupForm.team,
+            joinDate: today(),
+            collabId: signupForm.role === "Collaborator" ? genId() : null
+          };
+          // Push to local USERS_DB so demo quick-login still works
+          USERS_DB.push({ ...newUser, password: signupForm.password });
+          onLogin(newUser);
         }
+      } catch (err) {
+        setError("Erreur réseau. Vérifiez votre connexion.");
       }
-      
-      onLogin(newUser);
       setLoading(false);
-    }, 600);
+    })();
   }
 
   function quickLogin(user) {
@@ -1762,53 +1818,73 @@ export default function App() {
   // ── Initialize data on login ──
   useEffect(() => {
     if (!loggedInUser) return;
-    
-    if (loggedInUser.role === "TL") {
-      // TL: Load their projects and collaborators
-      const tlKey = `tl_data_${loggedInUser.id}`;
-      const savedData = localStorage.getItem(tlKey);
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        setProjects(data.projects || []);
-        setCollaborators(data.collaborators || []);
-        setMeetings(data.meetings || []);
-      }
-    } else {
-      // Collaborator: Load only their assigned projects
-      const collabKey = `collab_data_${loggedInUser.collabId}`;
-      const savedData = localStorage.getItem(collabKey);
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        setProjects(data.projects || []);
-        setCollaborators(data.collaborators || []);
-        setMeetings(data.meetings || []);
-      }
-    }
-  }, [loggedInUser]);
 
-  // ── Persist data to localStorage whenever it changes ──
-  useEffect(() => {
-    if (!loggedInUser) return;
-    
-    const dataToSave = { projects, collaborators, meetings };
-    
-    if (loggedInUser.role === "TL") {
-      const tlKey = `tl_data_${loggedInUser.id}`;
-      localStorage.setItem(tlKey, JSON.stringify(dataToSave));
-      // Share TL data with all invited collaborators
-      collaborators.forEach(collab => {
-        if (collab.invitationToken) {
-          const collabUser = USERS_DB.find(u => u.invitationToken === collab.invitationToken && u.role === "Collaborator");
-          if (collabUser) {
-            const collabKey = `collab_data_${collabUser.collabId}`;
-            localStorage.setItem(collabKey, JSON.stringify(dataToSave));
+    (async () => {
+      if (loggedInUser.role === "TL") {
+        // TL: load from Supabase table 'tl_app_data', fallback to localStorage
+        const { data: row } = await supabase
+          .from('tl_app_data')
+          .select('data')
+          .eq('tl_id', loggedInUser.id)
+          .single();
+        if (row?.data) {
+          setProjects(row.data.projects || []);
+          setCollaborators(row.data.collaborators || []);
+          setMeetings(row.data.meetings || []);
+        } else {
+          // Fallback: try localStorage for existing TL data
+          const saved = localStorage.getItem(`tl_data_${loggedInUser.id}`);
+          if (saved) {
+            const data = JSON.parse(saved);
+            setProjects(data.projects || []);
+            setCollaborators(data.collaborators || []);
+            setMeetings(data.meetings || []);
           }
         }
-      });
-    } else {
-      const collabKey = `collab_data_${loggedInUser.collabId}`;
-      localStorage.setItem(collabKey, JSON.stringify(dataToSave));
-    }
+      } else {
+        // Collaborator: load the TL's data using their tlId
+        const tlId = loggedInUser.tlId;
+        if (!tlId) {
+          // Fallback to localStorage
+          const saved = localStorage.getItem(`collab_data_${loggedInUser.collabId}`);
+          if (saved) {
+            const data = JSON.parse(saved);
+            setProjects(data.projects || []);
+            setCollaborators(data.collaborators || []);
+            setMeetings(data.meetings || []);
+          }
+          return;
+        }
+        const { data: row } = await supabase
+          .from('tl_app_data')
+          .select('data')
+          .eq('tl_id', tlId)
+          .single();
+        if (row?.data) {
+          setProjects(row.data.projects || []);
+          setCollaborators(row.data.collaborators || []);
+          setMeetings(row.data.meetings || []);
+        }
+      }
+    })();
+  }, [loggedInUser]);
+
+  // ── Persist data to Supabase (TL only) whenever it changes ──
+  useEffect(() => {
+    if (!loggedInUser || loggedInUser.role !== "TL") return;
+
+    const dataToSave = { projects, collaborators, meetings };
+
+    // Save to Supabase so all collaborators can read it
+    (async () => {
+      const { error } = await supabase
+        .from('tl_app_data')
+        .upsert({ tl_id: loggedInUser.id, data: dataToSave }, { onConflict: 'tl_id' });
+      if (error) {
+        // Fallback: save to localStorage
+        localStorage.setItem(`tl_data_${loggedInUser.id}`, JSON.stringify(dataToSave));
+      }
+    })();
   }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
@@ -2295,14 +2371,6 @@ export default function App() {
                 ) : (
                   collaborators.filter(c => c.email).map(c => {
                     const sp = allSubprojects.find(s => s.id === c.subprojectId);
-                    // Generate or retrieve token for this collaborator
-                    let token = c.invitationToken;
-                    if (!token) {
-                      token = createInvitationToken(c.email, c.subprojectId, loggedInUser.id);
-                      // Update collaborator with token
-                      setCollaborators(prev => prev.map(col => col.id === c.id ? { ...col, invitationToken: token } : col));
-                    }
-                    const inviteLink = `${window.location.origin}?invite=${token}`;
                     return (
                       <div key={c.id} style={{ padding: 12, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                         <div>
@@ -2310,7 +2378,32 @@ export default function App() {
                           <div style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--mono)" }}>{c.email}</div>
                           <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>→ {sp?.name}</div>
                         </div>
-                        <button className="btn btn-ghost btn-xs" onClick={() => { navigator.clipboard.writeText(inviteLink); alert("Invitation link copied!"); }}>📋 Copy Link</button>
+                        <button className="btn btn-ghost btn-xs" onClick={async () => {
+                          try {
+                            // If already has a token stored, reuse it
+                            if (c.invitationToken) {
+                              const link = `${window.location.origin}?invite=${c.invitationToken}`;
+                              await navigator.clipboard.writeText(link);
+                              alert("Lien d'invitation copié !\n\n" + link);
+                              return;
+                            }
+                            // Otherwise create a new one via the API (persisted in Supabase)
+                            const res = await fetch('/api/invitations/create', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ email: c.email, subprojectId: c.subprojectId, tlId: loggedInUser.id })
+                            });
+                            const data = await res.json();
+                            if (!res.ok) { alert("Erreur: " + (data.error || "Impossible de créer le lien")); return; }
+                            // Save token on collaborator so we don't re-create it
+                            setCollaborators(prev => prev.map(col => col.id === c.id ? { ...col, invitationToken: data.token } : col));
+                            const link = `${window.location.origin}?invite=${data.token}`;
+                            await navigator.clipboard.writeText(link);
+                            alert("Lien d'invitation copié !\n\n" + link);
+                          } catch {
+                            alert("Erreur lors de la génération du lien.");
+                          }
+                        }}>📋 Copy Link</button>
                       </div>
                     );
                   })

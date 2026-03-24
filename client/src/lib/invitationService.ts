@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from './supabaseAuth';
 
 // In-memory fallback storage
 const INVITATION_TOKENS: Record<string, any> = {};

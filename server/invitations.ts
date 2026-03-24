@@ -119,7 +119,8 @@ router.post('/api/users/create-from-invitation', async (req, res) => {
     
     // Create user
     const userId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    
+    const collabId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
     const { error: userError } = await supabase
       .from('users')
       .insert([{
@@ -130,7 +131,10 @@ router.post('/api/users/create-from-invitation', async (req, res) => {
         role: 'Collaborator',
         department: department || '',
         team: team || '',
-        joinDate: new Date().toISOString()
+        joinDate: new Date().toISOString(),
+        collabId,
+        tlId: invitation.tlId,
+        subprojectId: invitation.subprojectId
       }]);
     
     if (userError) {
@@ -144,7 +148,7 @@ router.post('/api/users/create-from-invitation', async (req, res) => {
       .update({ acceptedAt: new Date().toISOString() })
       .eq('token', token);
     
-    res.json({ success: true, userId, email: invitation.email });
+    res.json({ success: true, userId, collabId, tlId: invitation.tlId, subprojectId: invitation.subprojectId, email: invitation.email });
   } catch (err) {
     console.error('Error:', err);
     res.status(500).json({ error: 'Internal server error' });
