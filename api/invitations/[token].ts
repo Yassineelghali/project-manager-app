@@ -1,0 +1,30 @@
+import { createClient } from '@supabase/supabase-js';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const { token } = req.query as { token: string };
+
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('invitation_tokens').select('*').eq('token', token).single();
+    if (error || !data) return res.status(404).json({ error: 'Invitation not found' });
+    return res.json(data);
+  }
+
+  if (req.method === 'POST') {
+    // Accept invitation — called from InvitationPage or handleSignup
+    const { error } = await supabase
+      .from('invitation_tokens')
+      .update({ acceptedAt: new Date().toISOString() })
+      .eq('token', token);
+    if (error) return res.status(500).json({ error: 'Failed to accept invitation' });
+    return res.json({ success: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
