@@ -4,7 +4,11 @@
   "installCommand": "npm install",
   "framework": null,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/api/invitations/create", "destination": "/api/invitations/create" },
+    { "source": "/api/invitations/:token", "destination": "/api/invitations/[token]" },
+    { "source": "/api/users/create", "destination": "/api/users/create" },
+    { "source": "/api/users/login", "destination": "/api/users/login" },
+    { "source": "/api/users/create-from-invitation", "destination": "/api/users/create-from-invitation" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
