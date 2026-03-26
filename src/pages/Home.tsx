@@ -855,8 +855,21 @@ function LoginScreen({ onLogin }) {
       if (profile) {
         onLogin({ ...profile, initials: profile.name?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2) });
       } else {
-        // Supabase Auth ok but no profile row yet — use auth user info
-        onLogin({ id: authResult.user?.id, email, name: email, role: 'Collaborator', initials: email[0].toUpperCase(), collabId: authResult.user?.id });
+        // No profile row — read role from Supabase Auth metadata (saved at signup)
+        const meta = authResult.user?.user_metadata || {};
+        const name = meta.name || email;
+        const role = meta.role || 'TL';
+        const initials = name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+        const userId = authResult.user?.id || `user_${Date.now()}`;
+        // Create the missing profile row on-the-fly
+        await supabase.from('users').upsert([{
+          id: userId, name, email, role,
+          department: meta.department || '',
+          team: meta.team || '',
+          joinDate: new Date().toISOString(),
+          collabId: role === 'Collaborator' ? userId : null
+        }]);
+        onLogin({ id: userId, email, name, role, initials, collabId: role === 'Collaborator' ? userId : null });
       }
       setLoading(false);
     })();
@@ -925,9 +938,7 @@ function LoginScreen({ onLogin }) {
 
         } else {
           // ── Path B: TL self-signup ──
-          const authResult = await signUp(userEmail, signupForm.password, { name: signupForm.name });
-          if (!authResult.success) { setError(authResult.error || "Erreur lors de la création du compte"); setLoading(false); return; }
-
+          // 1. Create profile in public.users FIRST
           const res = await fetch('/api/users/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -943,6 +954,15 @@ function LoginScreen({ onLogin }) {
           const data = await res.json();
           if (!res.ok) { setError(data.error || "Erreur lors de la création du compte"); setLoading(false); return; }
 
+          // 2. Register in Supabase Auth with role in metadata so login always knows the role
+          const authResult = await signUp(userEmail, signupForm.password, {
+            name: signupForm.name,
+            role: signupForm.role,
+            department: signupForm.department,
+            team: signupForm.team
+          });
+          if (!authResult.success) { setError(authResult.error || "Erreur lors de la création du compte"); setLoading(false); return; }
+
           const newUser = {
             id: data.userId,
             name: signupForm.name,
@@ -955,8 +975,6 @@ function LoginScreen({ onLogin }) {
             joinDate: today(),
             collabId: signupForm.role === "Collaborator" ? genId() : null
           };
-          // Push to local USERS_DB so demo quick-login still works
-          USERS_DB.push({ ...newUser, password: signupForm.password });
           onLogin(newUser);
         }
       } catch (err) {
