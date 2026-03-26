@@ -2,13 +2,15 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": "vite",
-  "rewrites": [
-    { "source": "/api/invitations/create", "destination": "/api/invitations/create" },
-    { "source": "/api/invitations/:token", "destination": "/api/invitations/[token]" },
-    { "source": "/api/users/create", "destination": "/api/users/create" },
-    { "source": "/api/users/login", "destination": "/api/users/login" },
-    { "source": "/api/users/create-from-invitation", "destination": "/api/users/create-from-invitation" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "framework": null,
+  "routes": [
+    { "src": "/api/invitations/create", "dest": "/api/invitations/create" },
+    { "src": "/api/invitations/([^/]+)", "dest": "/api/invitations/[token]" },
+    { "src": "/api/users/create-from-invitation", "dest": "/api/users/create-from-invitation" },
+    { "src": "/api/users/create", "dest": "/api/users/create" },
+    { "src": "/api/users/login", "dest": "/api/users/login" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

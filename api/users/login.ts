@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
+  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
