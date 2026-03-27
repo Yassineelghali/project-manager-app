@@ -14,9 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: invitation, error: invError } = await supabase
     .from('invitation_tokens').select('*').eq('token', token).single();
-
   if (invError || !invitation) return res.status(404).json({ error: 'Invitation not found' });
-  if (invitation.acceptedAt) return res.status(400).json({ error: 'Invitation already used' });
+  if (invitation.accepted_at) return res.status(400).json({ error: 'Invitation already used' });
 
   const userId = `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
   const collabId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -28,17 +27,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     role: 'Collaborator',
     department: department || '',
     team: team || '',
-    joinDate: new Date().toISOString(),
-    collabId,
-    tlId: invitation.tlId,
-    subprojectId: invitation.subprojectId
+    join_date: new Date().toISOString(),
+    collab_id: collabId,
+    tl_id: invitation.tl_id,
+    subproject_id: invitation.subproject_id
   }]);
 
-  if (userError) return res.status(500).json({ error: 'Failed to create user' });
+  if (userError) {
+    console.error('Insert error:', userError);
+    return res.status(500).json({ error: 'Failed to create user', details: userError.message });
+  }
 
   await supabase.from('invitation_tokens')
-    .update({ acceptedAt: new Date().toISOString() })
+    .update({ accepted_at: new Date().toISOString() })
     .eq('token', token);
 
-  return res.json({ success: true, userId, collabId, tlId: invitation.tlId, subprojectId: invitation.subprojectId, email: invitation.email });
+  return res.json({
+    success: true, userId, collabId,
+    tlId: invitation.tl_id,
+    subprojectId: invitation.subproject_id,
+    email: invitation.email
+  });
 }

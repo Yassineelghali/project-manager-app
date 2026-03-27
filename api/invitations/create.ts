@@ -15,13 +15,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = Math.random().toString(36).slice(2, 15) + Math.random().toString(36).slice(2, 15);
 
   const { error } = await supabase.from('invitation_tokens').insert([{
-    token, email, subprojectId, tlId,
-    createdAt: new Date().toISOString(),
-    acceptedAt: null
+    token, email,
+    subproject_id: subprojectId,
+    tl_id: tlId,
+    created_at: new Date().toISOString(),
+    accepted_at: null
   }]);
 
-  if (error) return res.status(500).json({ error: 'Failed to create invitation' });
+  if (error) return res.status(500).json({ error: 'Failed to create invitation', details: error.message });
 
-  const inviteLink = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}?invite=${token}`;
-  return res.json({ token, inviteLink });
+  const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  return res.json({ token, inviteLink: `${base}?invite=${token}` });
 }

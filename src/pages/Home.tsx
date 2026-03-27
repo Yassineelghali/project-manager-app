@@ -772,12 +772,12 @@ initializeInvitationTokens();
 // ─── USERS DATABASE (mock) ───────────────────────────────────────────────────
 
 const USERS_DB = [
-  { id: "tl1", name: "Marie Leclerc", initials: "ML", email: "m.leclerc@weektrack.io", role: "TL", password: "tl1234", color: "#00A8CC", department: "Engineering", team: "Powertrain Team", joinDate: "2023-06-01", collabId: null },
-  { id: "tl2", name: "Thomas Bernard", initials: "TB", email: "t.bernard@weektrack.io", role: "TL", password: "tl5678", color: "#2E5EAA", department: "Engineering", team: "ADAS Team", joinDate: "2022-11-15", collabId: null },
-  { id: "c1",  name: "Yassine Mansouri", initials: "YM", email: "y.mansouri@weektrack.io", role: "Collaborator", password: "collab1", color: "#64B4DC", department: "Powertrain ECU", team: "Powertrain Team", joinDate: "2024-01-15", collabId: "c1" },
-  { id: "c2",  name: "Inès Boudali", initials: "IB", email: "i.boudali@weektrack.io", role: "Collaborator", password: "collab2", color: "#1DD3B0", department: "Powertrain ECU", team: "Powertrain Team", joinDate: "2024-03-05", collabId: "c2" },
-  { id: "c3",  name: "Karim Sefrioui", initials: "KS", email: "k.sefrioui@weektrack.io", role: "Collaborator", password: "collab3", color: "#2E5EAA", department: "ADAS Integration", team: "ADAS Team", joinDate: "2025-01-10", collabId: "c3" },
-  { id: "c4",  name: "Lina Ouhabi", initials: "LO", email: "l.ouhabi@weektrack.io", role: "Collaborator", password: "collab4", color: "#64B4DC", department: "ADAS Integration", team: "ADAS Team", joinDate: "2025-01-20", collabId: "c4" },
+  { id: "tl1", name: "Marie Leclerc", initials: "ML", email: "m.leclerc@weektrack.io", role: "TL", password: "tl1234", color: "#00A8CC", department: "Engineering", team: "Powertrain Team", join_date: "2023-06-01", collabId: null },
+  { id: "tl2", name: "Thomas Bernard", initials: "TB", email: "t.bernard@weektrack.io", role: "TL", password: "tl5678", color: "#2E5EAA", department: "Engineering", team: "ADAS Team", join_date: "2022-11-15", collabId: null },
+  { id: "c1",  name: "Yassine Mansouri", initials: "YM", email: "y.mansouri@weektrack.io", role: "Collaborator", password: "collab1", color: "#64B4DC", department: "Powertrain ECU", team: "Powertrain Team", join_date: "2024-01-15", collabId: "c1" },
+  { id: "c2",  name: "Inès Boudali", initials: "IB", email: "i.boudali@weektrack.io", role: "Collaborator", password: "collab2", color: "#1DD3B0", department: "Powertrain ECU", team: "Powertrain Team", join_date: "2024-03-05", collabId: "c2" },
+  { id: "c3",  name: "Karim Sefrioui", initials: "KS", email: "k.sefrioui@weektrack.io", role: "Collaborator", password: "collab3", color: "#2E5EAA", department: "ADAS Integration", team: "ADAS Team", join_date: "2025-01-10", collabId: "c3" },
+  { id: "c4",  name: "Lina Ouhabi", initials: "LO", email: "l.ouhabi@weektrack.io", role: "Collaborator", password: "collab4", color: "#64B4DC", department: "ADAS Integration", team: "ADAS Team", join_date: "2025-01-20", collabId: "c4" },
 ];
 
 // ─── LOGIN SCREEN ────────────────────────────────────────────────────────────
@@ -866,7 +866,7 @@ function LoginScreen({ onLogin }) {
           id: userId, name, email, role,
           department: meta.department || '',
           team: meta.team || '',
-          joinDate: new Date().toISOString(),
+          join_date: new Date().toISOString(),
           collabId: role === 'Collaborator' ? userId : null
         }]);
         onLogin({ id: userId, email, name, role, initials, collabId: role === 'Collaborator' ? userId : null });
@@ -929,7 +929,7 @@ function LoginScreen({ onLogin }) {
             color: signupForm.color || "#64B4DC",
             department: signupForm.department || "General",
             team: signupForm.team,
-            joinDate: today(),
+            join_date: today(),
             collabId: data.collabId,
             tlId: data.tlId,
             subprojectId: data.subprojectId
@@ -972,7 +972,7 @@ function LoginScreen({ onLogin }) {
             color: signupForm.color || "#00A8CC",
             department: signupForm.department || "General",
             team: signupForm.team,
-            joinDate: today(),
+            join_date: today(),
             collabId: signupForm.role === "Collaborator" ? genId() : null
           };
           onLogin(newUser);
@@ -1307,7 +1307,7 @@ function AccountModal({ user, notifications, meetings, collaborators, onClose, o
                     { label: "Département", value: user.department },
                     { label: "Équipe", value: user.team },
                     { label: "Rôle", value: user.role === "TL" ? "Team Leader" : "Collaborateur" },
-                    { label: "Membre depuis", value: new Date(user.joinDate).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) },
+                    { label: "Membre depuis", value: new Date(user.join_date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) },
                   ].map(f => (
                     <div key={f.label} className="account-field">
                       <span className="account-field-label">{f.label}</span>

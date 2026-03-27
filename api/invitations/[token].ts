@@ -13,14 +13,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data, error } = await supabase
       .from('invitation_tokens').select('*').eq('token', token).single();
     if (error || !data) return res.status(404).json({ error: 'Invitation not found' });
-    return res.json(data);
+    // Return camelCase for frontend compatibility
+    return res.json({
+      ...data,
+      subprojectId: data.subproject_id,
+      tlId: data.tl_id,
+      acceptedAt: data.accepted_at,
+      createdAt: data.created_at
+    });
   }
 
   if (req.method === 'POST') {
-    // Accept invitation — called from InvitationPage or handleSignup
     const { error } = await supabase
       .from('invitation_tokens')
-      .update({ acceptedAt: new Date().toISOString() })
+      .update({ accepted_at: new Date().toISOString() })
       .eq('token', token);
     if (error) return res.status(500).json({ error: 'Failed to accept invitation' });
     return res.json({ success: true });
