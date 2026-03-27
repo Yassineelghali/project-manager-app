@@ -4,9 +4,13 @@
   "installCommand": "npm install",
   "framework": null,
   "rewrites": [
-    {
-      "source": "/((?!api|assets|favicon\\.ico).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/tl-data/:tlId", "destination": "/api/tl-data/[tlId]" },
+    { "source": "/api/invitations/create", "destination": "/api/invitations/create" },
+    { "source": "/api/invitations/:token", "destination": "/api/invitations/[token]" },
+    { "source": "/api/users/create-from-invitation", "destination": "/api/users/create-from-invitation" },
+    { "source": "/api/users/create", "destination": "/api/users/create" },
+    { "source": "/api/users/login", "destination": "/api/users/login" },
+    { "source": "/api/debug", "destination": "/api/debug" },
+    { "source": "/((?!api|assets|favicon\\.ico).*)", "destination": "/index.html" }
   ]
 }

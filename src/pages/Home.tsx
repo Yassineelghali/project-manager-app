@@ -839,9 +839,6 @@ function LoginScreen({ onLogin }) {
       // 1. Authenticate via Supabase Auth
       const authResult = await signIn(email, password);
       if (!authResult.success) {
-        // Fallback: try local USERS_DB for demo accounts
-        const demoUser = USERS_DB.find(u => u.email === email && u.password === password);
-        if (demoUser) { onLogin(demoUser); setLoading(false); return; }
         setError("Identifiants incorrects. Vérifiez votre email et mot de passe.");
         setLoading(false);
         return;
@@ -853,15 +850,16 @@ function LoginScreen({ onLogin }) {
         .eq('email', email)
         .single();
       if (profile) {
-        onLogin({
+        const userProfile = {
           ...profile,
-          // Map snake_case DB columns to camelCase for the app
           collabId: profile.collab_id,
           tlId: profile.tl_id,
           subprojectId: profile.subproject_id,
           joinDate: profile.join_date,
           initials: profile.name?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
-        });
+        };
+        console.log("[LOGIN] Profile from Supabase:", userProfile);
+        onLogin(userProfile);
       } else {
         // No profile row — read role from Supabase Auth metadata (saved at signup)
         const meta = authResult.user?.user_metadata || {};
@@ -1076,7 +1074,8 @@ function LoginScreen({ onLogin }) {
               Pas encore de compte ? <button onClick={() => setMode("signup")} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", fontSize: 12 }}>Créer un compte</button>
             </div>
 
-            <div className="login-divider">comptes demo</div>
+            {/* Demo accounts hidden in production */}
+            {false && <div className="login-divider">comptes demo</div>}
 
             <div className="demo-label">Cliquez pour vous connecter rapidement</div>
             <div className="demo-accounts">
@@ -1844,40 +1843,60 @@ export default function App() {
   // ── dataLoaded ref: prevents persisting empty data before load completes ──
   const dataLoaded = useRef(false);
 
+  // ── Helper: load TL data via API (uses service_role key — bypasses RLS) ──
+  async function loadTlData(tlId: string) {
+    try {
+      const res = await fetch(`/api/tl-data/${tlId}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data;
+    } catch { return null; }
+  }
+
+  // ── Helper: save TL data via API ──
+  async function saveTlData(tlId: string, data: any) {
+    try {
+      await fetch(`/api/tl-data/${tlId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } catch (e) { console.error('Save error:', e); }
+  }
+
   // ── Initialize data on login ──
   useEffect(() => {
     if (!loggedInUser) { dataLoaded.current = false; return; }
-
-    dataLoaded.current = false; // reset on each login
+    dataLoaded.current = false;
 
     (async () => {
-      if (loggedInUser.role === "TL") {
-        const { data: row } = await supabase
-          .from('tl_app_data')
-          .select('data')
-          .eq('tl_id', loggedInUser.id)
-          .maybeSingle();
-        if (row?.data) {
-          setProjects(row.data.projects || []);
-          setCollaborators(row.data.collaborators || []);
-          setMeetings(row.data.meetings || []);
-        }
-      } else {
-        // Collaborator: load from their TL's data
-        const tlId = loggedInUser.tlId || loggedInUser.tl_id;
-        if (!tlId) return;
-        const { data: row } = await supabase
-          .from('tl_app_data')
-          .select('data')
-          .eq('tl_id', tlId)
-          .maybeSingle();
-        if (row?.data) {
-          setProjects(row.data.projects || []);
-          setCollaborators(row.data.collaborators || []);
-          setMeetings(row.data.meetings || []);
-        }
+      const tlId = loggedInUser.role === "TL"
+        ? loggedInUser.id
+        : (loggedInUser.tlId || loggedInUser.tl_id);
+
+      console.log("[SYNC] Login:", {
+        role: loggedInUser.role,
+        id: loggedInUser.id,
+        tlId: loggedInUser.tlId,
+        tl_id: loggedInUser.tl_id,
+        resolvedTlId: tlId
+      });
+
+      if (!tlId) {
+        console.warn("[SYNC] No tlId found — data will not load!");
+        dataLoaded.current = true;
+        return;
       }
-      // Mark data as loaded — now safe to persist
+
+      console.log("[SYNC] Loading data from /api/tl-data/" + tlId);
+      const data = await loadTlData(tlId);
+      console.log("[SYNC] Data received:", data ? `${data.projects?.length} projects, ${data.meetings?.length} meetings` : "NULL");
+
+      if (data) {
+        setProjects(data.projects || []);
+        setCollaborators(data.collaborators || []);
+        setMeetings(data.meetings || []);
+      }
       dataLoaded.current = true;
     })();
   }, [loggedInUser]);
@@ -1889,38 +1908,21 @@ export default function App() {
     if (!tlId) return;
 
     const interval = setInterval(async () => {
-      const { data: row } = await supabase
-        .from('tl_app_data')
-        .select('data')
-        .eq('tl_id', tlId)
-        .maybeSingle();
-      if (row?.data) {
-        setProjects(row.data.projects || []);
-        setCollaborators(row.data.collaborators || []);
-        setMeetings(row.data.meetings || []);
+      const data = await loadTlData(tlId);
+      if (data) {
+        setProjects(data.projects || []);
+        setCollaborators(data.collaborators || []);
+        setMeetings(data.meetings || []);
       }
-    }, 30000); // every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase (TL only) whenever it changes ──
+  // ── Persist data to Supabase via API (TL only) whenever it changes ──
   useEffect(() => {
-    // Never persist before initial data load — would overwrite Supabase with empty arrays
     if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded.current) return;
-
-    const dataToSave = { projects, collaborators, meetings };
-
-    (async () => {
-      const { error } = await supabase
-        .from('tl_app_data')
-        .upsert({ tl_id: loggedInUser.id, data: dataToSave }, { onConflict: 'tl_id' });
-      if (error) {
-        console.error('Supabase upsert error:', error);
-        // Fallback to localStorage
-        localStorage.setItem(`tl_data_${loggedInUser.id}`, JSON.stringify(dataToSave));
-      }
-    })();
+    saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
