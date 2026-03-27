@@ -2,47 +2,31 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const results: any = { env: {}, tests: {} };
+  const results: any = {};
 
-  results.env = {
-    hasUrl: !!process.env.VITE_SUPABASE_URL,
-    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-  };
+  const supabase = createClient(
+    process.env.VITE_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  try {
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+  // 1. List all tl_app_data rows
+  const { data: tlData, error: tlError } = await supabase
+    .from('tl_app_data').select('tl_id, updated_at, data');
+  results.tl_app_data = { rows: tlData, error: tlError };
 
-    // Test 1: list all invitation tokens
-    const { data: tokens, error: tokensError } = await supabase
-      .from('invitation_tokens').select('token, email, tl_id, accepted_at').limit(10);
-    results.tests.invitation_tokens = { count: tokens?.length, tokens, error: tokensError };
+  // 2. Test upsert into tl_app_data
+  const testTlId = 'debug_tl_test';
+  const { error: upsertError } = await supabase
+    .from('tl_app_data')
+    .upsert({ tl_id: testTlId, data: { projects: [], meetings: [], collaborators: [] } }, { onConflict: 'tl_id' });
+  results.upsert_test = { error: upsertError };
 
-    // Test 2: insert + retrieve a test invitation
-    const testToken = `test_${Date.now()}`;
-    const { error: insertErr } = await supabase.from('invitation_tokens').insert([{
-      token: testToken,
-      email: 'test@test.com',
-      subproject_id: 'sp1',
-      tl_id: 'tl1',
-      created_at: new Date().toISOString(),
-      accepted_at: null
-    }]);
-    results.tests.insert_invitation = { error: insertErr };
+  // cleanup
+  await supabase.from('tl_app_data').delete().eq('tl_id', testTlId);
 
-    if (!insertErr) {
-      const { data: found, error: findErr } = await supabase
-        .from('invitation_tokens').select('*').eq('token', testToken).single();
-      results.tests.retrieve_invitation = { found, error: findErr };
-      // cleanup
-      await supabase.from('invitation_tokens').delete().eq('token', testToken);
-    }
-
-  } catch (err: any) {
-    results.exception = err.message;
-  }
+  // 3. List all users with their tl_id
+  const { data: users } = await supabase.from('users').select('id, name, role, tl_id, collab_id');
+  results.users = users;
 
   return res.json(results);
 }
