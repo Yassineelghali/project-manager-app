@@ -1079,7 +1079,7 @@ function LoginScreen({ onLogin }) {
 
             <div className="demo-label">Cliquez pour vous connecter rapidement</div>
             <div className="demo-accounts">
-              {USERS_DB.slice(0, 6).map(u => (
+              {window.location.hostname === 'localhost' && USERS_DB.slice(0, 6).map(u => (
                 <div key={u.id} className="demo-card" onClick={() => quickLogin(u)}>
                   <div className="avatar" style={{ width: 30, height: 30, background: u.color + "22", color: u.color, border: `1.5px solid ${u.color}44`, fontSize: 10, fontFamily: "var(--mono)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {u.initials}
@@ -1458,7 +1458,14 @@ function TaskCard({ task, onOpen, onDragStart, onDragEnd, isTL, collaborator }) 
 
 // ── SUBSECTION ──
 function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator }) {
-  const [open, setOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
+  // Use a ref to persist open state across parent re-renders
+  const openRef = useRef(sectionKey !== "closed" && sectionKey !== "outside");
+  const [open, setOpenState] = useState(openRef.current);
+  const setOpen = (val: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof val === "function" ? val(openRef.current) : val;
+    openRef.current = next;
+    setOpenState(next);
+  };
   const [dragOver, setDragOver] = useState(false);
   const [dragging, setDragging] = useState(null);
 
@@ -1788,8 +1795,45 @@ function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
 export default function App() {
   // ── AUTH STATE ──
   const [loggedInUser, setLoggedInUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // ── AUTH: restore session on mount + listen for changes ──
+  useEffect(() => {
+    // Check if Supabase has an active session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        // Fetch profile from public.users
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email)
+          .maybeSingle();
+        if (profile) {
+          const initials = profile.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+          setLoggedInUser({
+            ...profile,
+            collabId: profile.collab_id,
+            tlId: profile.tl_id,
+            subprojectId: profile.subproject_id,
+            joinDate: profile.join_date,
+            initials
+          });
+        }
+      }
+      setAuthChecked(true);
+    });
+
+    // Listen for auth changes (logout from another tab, session expiry)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setLoggedInUser(null);
+        setAuthChecked(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── THEME STATE ──
   const [theme, setTheme] = useState(() => {
@@ -1834,7 +1878,18 @@ export default function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
-  function handleLogout() { setLoggedInUser(null); setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false); }
+  function handleLogout() {
+    // Sign out from Supabase Auth to clear the session token
+    import("@/lib/supabaseAuth").then(({ signOut }) => signOut());
+    setLoggedInUser(null);
+    setProjects([]);
+    setCollaborators([]);
+    setMeetings([]);
+    setDataLoaded(false);
+    setView("dashboard");
+    setUserMenuOpen(false);
+    setShowAccountModal(false);
+  }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
     const newInitials = form.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -1923,15 +1978,18 @@ export default function App() {
     })();
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase (TL only — triggered on every data change) ──
+  // ── Persist data to Supabase (TL only — triggered on data change, not auth change) ──
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
-  }, [projects, collaborators, meetings, loggedInUser]);
+  }, [projects, collaborators, meetings]); // intentionally exclude loggedInUser to avoid wipe on login
 
 
 
   // ── Show login screen if not authenticated ──
+  // Show nothing while checking auth session (prevents login flash)
+  if (!authChecked) return <><style>{css}</style><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text3)', fontSize: 14 }}>Chargement…</div></>;
+
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
 
 
@@ -1971,17 +2029,26 @@ export default function App() {
     setMeetings(prev => applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater));
   }
 
+  // pendingSave: stores the latest meetings to save after React finishes rendering
+  const pendingSaveRef = useRef<any[] | null>(null);
+
   function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
     setMeetings(prev => {
       const updated = applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater);
-      // Save immediately with the computed value — no stale closure
-      if (!isTL) {
-        const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
-        if (tlId) saveTlData(tlId, { projects, collaborators, meetings: updated });
-      }
+      pendingSaveRef.current = updated; // schedule save after render
       return updated;
     });
   }
+
+  // Execute pending save after render — outside React setter, no double-call issue
+  useEffect(() => {
+    if (!pendingSaveRef.current || isTL) return;
+    const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
+    if (!tlId) return;
+    const toSave = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    saveTlData(tlId, { projects, collaborators, meetings: toSave });
+  });
 
   function handleSaveTask(formData) {
     if (!taskModal) return;
