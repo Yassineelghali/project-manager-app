@@ -1820,7 +1820,8 @@ export default function App() {
   // ── Derived from auth ──
   const role = loggedInUser?.role || "TL";
   const currentUser = loggedInUser || {};
-  const collabUserId = loggedInUser?.collabId || "c1";
+  // Use resolvedCollabId (matched by email from TL's collaborators array) or fallback to collabId
+  const collabUserId = loggedInUser?.resolvedCollabId || loggedInUser?.collabId || "c1";
   const isTL = role === "TL";
   const unreadCount = notifications.filter(n => !n.read).length;
   const userColor = loggedInUser?.color || "#00A8CC";
@@ -1896,6 +1897,21 @@ export default function App() {
         setProjects(data.projects || []);
         setCollaborators(data.collaborators || []);
         setMeetings(data.meetings || []);
+
+        // For collaborators: resolve the real collabId from the collaborators array by email
+        // The TL assigned a local id (e.g. "u8aa0ki") which is the key used in meeting sections
+        if (loggedInUser.role !== "TL") {
+          const matchingCollab = (data.collaborators || []).find(
+            (c: any) => c.email === loggedInUser.email
+          );
+          if (matchingCollab) {
+            console.log("[SYNC] Resolved collabId from collaborators array:", matchingCollab.id);
+            // Update the logged-in user with the correct collabId
+            setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
+          } else {
+            console.warn("[SYNC] No matching collaborator found for email:", loggedInUser.email);
+          }
+        }
       }
       dataLoaded.current = true;
     })();
@@ -1913,6 +1929,13 @@ export default function App() {
         setProjects(data.projects || []);
         setCollaborators(data.collaborators || []);
         setMeetings(data.meetings || []);
+        // Re-resolve collabId in case it changed
+        const matchingCollab = (data.collaborators || []).find(
+          (c: any) => c.email === loggedInUser.email
+        );
+        if (matchingCollab) {
+          setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
+        }
       }
     }, 30000);
 
