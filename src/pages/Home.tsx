@@ -1458,14 +1458,7 @@ function TaskCard({ task, onOpen, onDragStart, onDragEnd, isTL, collaborator }) 
 
 // ── SUBSECTION ──
 function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator }) {
-  // Use a ref to persist open state across parent re-renders
-  const openRef = useRef(sectionKey !== "closed" && sectionKey !== "outside");
-  const [open, setOpenState] = useState(openRef.current);
-  const setOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-    const next = typeof val === "function" ? val(openRef.current) : val;
-    openRef.current = next;
-    setOpenState(next);
-  };
+  const [open, setOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
   const [dragOver, setDragOver] = useState(false);
   const [dragging, setDragging] = useState(null);
 
@@ -1505,7 +1498,7 @@ function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL
 }
 
 // ── COLLABORATOR SECTION ──
-function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTask, isTL, projectColor }) {
+function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTask, isTL, projectColor, meetingId }) {
   const [expanded, setExpanded] = useState(true);
   const activeCount = (data.current?.length || 0) + (data.upcoming?.length || 0);
   const openPts = data.openPoints?.length || 0;
@@ -1528,7 +1521,7 @@ function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTas
         <div className="subsections">
           {SECTION_KEYS.map(k => (
             <Subsection
-              key={k}
+              key={`${collab.id}-${k}`}
               sectionKey={k}
               tasks={data[k] || []}
               onOpenTask={onOpenTask}
@@ -1825,12 +1818,13 @@ export default function App() {
       setAuthChecked(true);
     });
 
-    // Listen for auth changes (logout from another tab, session expiry)
+    // Listen for auth changes (logout, session expiry)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setLoggedInUser(null);
         setAuthChecked(true);
       }
+      // Do NOT auto-login on SIGNED_IN — user must log in manually
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1879,8 +1873,7 @@ export default function App() {
     }
   }
   function handleLogout() {
-    // Sign out from Supabase Auth to clear the session token
-    import("@/lib/supabaseAuth").then(({ signOut }) => signOut());
+    // Clear app state immediately
     setLoggedInUser(null);
     setProjects([]);
     setCollaborators([]);
@@ -1889,6 +1882,8 @@ export default function App() {
     setView("dashboard");
     setUserMenuOpen(false);
     setShowAccountModal(false);
+    // Sign out from Supabase — clears session so getSession() won't auto-restore
+    supabase.auth.signOut();
   }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
@@ -1978,16 +1973,13 @@ export default function App() {
     })();
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase (TL only — triggered on data change, not auth change) ──
+  // ── Persist data to Supabase (TL only) ──
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
-  }, [projects, collaborators, meetings]); // intentionally exclude loggedInUser to avoid wipe on login
+  }, [projects, collaborators, meetings]);
 
-
-
-  // ── Show login screen if not authenticated ──
-  // Show nothing while checking auth session (prevents login flash)
+  // ── ALL hooks declared above — conditional returns MUST come after all hooks ──
   if (!authChecked) return <><style>{css}</style><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text3)', fontSize: 14 }}>Chargement…</div></>;
 
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
@@ -2030,25 +2022,29 @@ export default function App() {
   }
 
   // pendingSave: stores the latest meetings to save after React finishes rendering
-  const pendingSaveRef = useRef<any[] | null>(null);
+  // Refs to always have fresh values in async callbacks
+  const projectsRef = useRef(projects);
+  const collaboratorsRef = useRef(collaborators);
+  useEffect(() => { projectsRef.current = projects; }, [projects]);
+  useEffect(() => { collaboratorsRef.current = collaborators; }, [collaborators]);
 
   function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
+    const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
     setMeetings(prev => {
       const updated = applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater);
-      pendingSaveRef.current = updated; // schedule save after render
+      if (tlId) {
+        // setTimeout 0 exits the React setter before saving
+        setTimeout(() => {
+          saveTlData(tlId, {
+            projects: projectsRef.current,
+            collaborators: collaboratorsRef.current,
+            meetings: updated
+          });
+        }, 0);
+      }
       return updated;
     });
   }
-
-  // Execute pending save after render — outside React setter, no double-call issue
-  useEffect(() => {
-    if (!pendingSaveRef.current || isTL) return;
-    const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
-    if (!tlId) return;
-    const toSave = pendingSaveRef.current;
-    pendingSaveRef.current = null;
-    saveTlData(tlId, { projects, collaborators, meetings: toSave });
-  });
 
   function handleSaveTask(formData) {
     if (!taskModal) return;
@@ -2769,12 +2765,13 @@ export default function App() {
           const data = meeting.sections[collab.id] || {};
           return (
             <CollabSection
-              key={collab.id}
+              key={`${meeting.id}-${collab.id}`}
               collab={collab}
               data={data}
               project={project}
               projectColor={project?.color || "#E8531D"}
               isTL={isTL}
+              meetingId={meeting.id}
               onOpenTask={(task) => {
                 const sKey = SECTION_KEYS.find(k => (data[k] || []).find(t => t.id === task.id));
                 openEditTask(task, collab.id, sKey);
