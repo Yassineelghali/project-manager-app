@@ -1855,14 +1855,20 @@ export default function App() {
   }
 
   // ── Helper: save TL data via API ──
-  async function saveTlData(tlId: string, data: any) {
+  async function saveTlData(tlId: string, data: any): Promise<void> {
     try {
-      await fetch(`/api/tl-data/${tlId}`, {
+      const res = await fetch(`/api/tl-data/${tlId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-    } catch (e) { console.error('Save error:', e); }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('[SAVE] Error:', err);
+      }
+    } catch (e) {
+      console.error('[SAVE] Network error:', e);
+    }
   }
 
   // ── Initialize data on login ──
@@ -1917,45 +1923,48 @@ export default function App() {
     })();
   }, [loggedInUser]);
 
+  // ── isSaving ref: blocks auto-refresh while a save is in progress ──
+  const isSaving = useRef(false);
+
   // ── Auto-refresh for collaborator: poll TL data every 30s ──
+  // Only refreshes projects/collaborators — never overwrites meetings (owned by collab)
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role === "TL") return;
     const tlId = loggedInUser.tlId || loggedInUser.tl_id;
     if (!tlId) return;
 
     const interval = setInterval(async () => {
+      if (isSaving.current) return; // skip refresh while saving
       const data = await loadTlData(tlId);
-      if (data) {
-        setProjects(data.projects || []);
-        setCollaborators(data.collaborators || []);
-        setMeetings(data.meetings || []);
-        // Re-resolve collabId in case it changed
-        const matchingCollab = (data.collaborators || []).find(
-          (c: any) => c.email === loggedInUser.email
-        );
-        if (matchingCollab) {
-          setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
-        }
+      if (!data || isSaving.current) return; // double-check after async
+      // Only update projects and collaborators from TL — never overwrite meetings
+      setProjects(data.projects || []);
+      setCollaborators(data.collaborators || []);
+      // Re-resolve collabId
+      const matchingCollab = (data.collaborators || []).find(
+        (c: any) => c.email === loggedInUser.email
+      );
+      if (matchingCollab) {
+        setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
       }
     }, 30000);
 
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase whenever meetings change (TL and Collaborator) ──
+  // ── Persist data to Supabase whenever data changes ──
   useEffect(() => {
     if (!loggedInUser || !dataLoaded) return;
 
-    if (loggedInUser.role === "TL") {
-      // TL saves everything (projects, collaborators, meetings)
-      saveTlData(loggedInUser.id, { projects, collaborators, meetings });
-    } else {
-      // Collaborator saves meetings back to TL's data (with their task changes)
-      const tlId = loggedInUser.tlId || loggedInUser.tl_id;
-      if (!tlId) return;
-      // We only update meetings — projects and collaborators are TL-owned
-      saveTlData(tlId, { projects, collaborators, meetings });
-    }
+    const tlId = loggedInUser.role === "TL"
+      ? loggedInUser.id
+      : (loggedInUser.tlId || loggedInUser.tl_id);
+    if (!tlId) return;
+
+    isSaving.current = true;
+    saveTlData(tlId, { projects, collaborators, meetings }).finally(() => {
+      isSaving.current = false;
+    });
   }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
