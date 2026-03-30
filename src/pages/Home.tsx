@@ -1979,6 +1979,12 @@ export default function App() {
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings]);
 
+  // ── Refs for fresh values in async callbacks — MUST be before any conditional return ──
+  const projectsRef = useRef(projects);
+  const collaboratorsRef = useRef(collaborators);
+  useEffect(() => { projectsRef.current = projects; }, [projects]);
+  useEffect(() => { collaboratorsRef.current = collaborators; }, [collaborators]);
+
   // ── ALL hooks declared above — conditional returns MUST come after all hooks ──
   if (!authChecked) return <><style>{css}</style><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text3)', fontSize: 14 }}>Chargement…</div></>;
 
@@ -2022,12 +2028,6 @@ export default function App() {
   }
 
   // pendingSave: stores the latest meetings to save after React finishes rendering
-  // Refs to always have fresh values in async callbacks
-  const projectsRef = useRef(projects);
-  const collaboratorsRef = useRef(collaborators);
-  useEffect(() => { projectsRef.current = projects; }, [projects]);
-  useEffect(() => { collaboratorsRef.current = collaborators; }, [collaborators]);
-
   function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
     const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
     setMeetings(prev => {
