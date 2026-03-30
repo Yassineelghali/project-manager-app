@@ -1942,10 +1942,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase via API (TL only) whenever it changes ──
+  // ── Persist data to Supabase whenever meetings change (TL and Collaborator) ──
   useEffect(() => {
-    if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded.current) return;
-    saveTlData(loggedInUser.id, { projects, collaborators, meetings });
+    if (!loggedInUser || !dataLoaded.current) return;
+
+    if (loggedInUser.role === "TL") {
+      // TL saves everything (projects, collaborators, meetings)
+      saveTlData(loggedInUser.id, { projects, collaborators, meetings });
+    } else {
+      // Collaborator saves meetings back to TL's data (with their task changes)
+      const tlId = loggedInUser.tlId || loggedInUser.tl_id;
+      if (!tlId) return;
+      // We only update meetings — projects and collaborators are TL-owned
+      saveTlData(tlId, { projects, collaborators, meetings });
+    }
   }, [projects, collaborators, meetings, loggedInUser]);
 
   // ── Show login screen if not authenticated ──
@@ -2002,11 +2012,11 @@ export default function App() {
       const updatedTask = { ...originalTask, ...formData, history: [...(originalTask.history || []), ...(histEntry ? [histEntry] : [])] };
 
       // Auto-categorize: move task to appropriate section based on status
+      // Collaborator can freely move between sections — only auto-move on explicit status changes
       let newSection = sectionKey;
       if (formData.status === "Closed") newSection = "closed";
       else if (formData.status === "Ongoing") newSection = "current";
-      else if (formData.status === "Open" && sectionKey === "upcoming") newSection = "upcoming";
-      else if (formData.status === "Open") newSection = "upcoming";
+      // Open status: keep in current section — don't force to upcoming
 
       if (newSection !== sectionKey) {
         updateMeetingSection(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== updatedTask.id));
@@ -2650,12 +2660,18 @@ export default function App() {
     if (!meeting) return <div className="empty-state"><div className="empty-state-text">Meeting not found</div></div>;
 
     const project = projects.find(p => p.id === meeting.projectId);
+    // For collaborator: find their entry by id OR by email (in case collabId not yet resolved)
+    const myCollabEntry = !isTL
+      ? collaborators.find(c => c.id === collabUserId) ||
+        collaborators.find(c => c.email === loggedInUser?.email)
+      : null;
+
     const projectCollabs = isTL
       ? getCollabsForProject(meeting.projectId)
-      : collaborators.filter(c => c.id === collabUserId);
+      : (myCollabEntry ? [myCollabEntry] : []);
 
     const isArchivedMeeting = !isTL && (() => {
-      const collab = collaborators.find(c => c.id === collabUserId);
+      const collab = myCollabEntry;
       if (!collab || !collab.changeHistory || collab.changeHistory.length === 0) return false;
       const changes = collab.changeHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
       const firstChange = changes[0];
