@@ -1923,49 +1923,13 @@ export default function App() {
     })();
   }, [loggedInUser]);
 
-  // ── isSaving ref: blocks auto-refresh while a save is in progress ──
-  const isSaving = useRef(false);
-
-  // ── Auto-refresh for collaborator: poll TL data every 30s ──
-  // Only refreshes projects/collaborators — never overwrites meetings (owned by collab)
+  // ── Persist data to Supabase (TL only — triggered on every data change) ──
   useEffect(() => {
-    if (!loggedInUser || loggedInUser.role === "TL") return;
-    const tlId = loggedInUser.tlId || loggedInUser.tl_id;
-    if (!tlId) return;
-
-    const interval = setInterval(async () => {
-      if (isSaving.current) return; // skip refresh while saving
-      const data = await loadTlData(tlId);
-      if (!data || isSaving.current) return; // double-check after async
-      // Only update projects and collaborators from TL — never overwrite meetings
-      setProjects(data.projects || []);
-      setCollaborators(data.collaborators || []);
-      // Re-resolve collabId
-      const matchingCollab = (data.collaborators || []).find(
-        (c: any) => c.email === loggedInUser.email
-      );
-      if (matchingCollab) {
-        setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [loggedInUser]);
-
-  // ── Persist data to Supabase whenever data changes ──
-  useEffect(() => {
-    if (!loggedInUser || !dataLoaded) return;
-
-    const tlId = loggedInUser.role === "TL"
-      ? loggedInUser.id
-      : (loggedInUser.tlId || loggedInUser.tl_id);
-    if (!tlId) return;
-
-    isSaving.current = true;
-    saveTlData(tlId, { projects, collaborators, meetings }).finally(() => {
-      isSaving.current = false;
-    });
+    if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
+    saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings, loggedInUser]);
+
+
 
   // ── Show login screen if not authenticated ──
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
@@ -1992,15 +1956,31 @@ export default function App() {
   // ── Meeting operations ──
   function getMeeting(id) { return meetings.find(m => m.id === id); }
 
-  function updateMeetingSection(meetingId, collabId, sectionKey, updater) {
-    setMeetings(prev => prev.map(m => {
+  function applyMeetingUpdate(prev: any[], meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
+    return prev.map(m => {
       if (m.id !== meetingId) return m;
       const sections = { ...m.sections };
       const collabSec = { ...(sections[collabId] || {}) };
       collabSec[sectionKey] = updater(collabSec[sectionKey] || []);
       sections[collabId] = collabSec;
       return { ...m, sections };
-    }));
+    });
+  }
+
+  function updateMeetingSection(meetingId, collabId, sectionKey, updater) {
+    setMeetings(prev => applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater));
+  }
+
+  function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
+    setMeetings(prev => {
+      const updated = applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater);
+      // Save immediately with the computed value — no stale closure
+      if (!isTL) {
+        const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
+        if (tlId) saveTlData(tlId, { projects, collaborators, meetings: updated });
+      }
+      return updated;
+    });
   }
 
   function handleSaveTask(formData) {
@@ -2027,11 +2007,13 @@ export default function App() {
       else if (formData.status === "Ongoing") newSection = "current";
       // Open status: keep in current section — don't force to upcoming
 
+      const save = isTL ? updateMeetingSection : updateMeetingSectionAndSave;
+
       if (newSection !== sectionKey) {
         updateMeetingSection(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== updatedTask.id));
-        updateMeetingSection(meetingId, collabId, newSection, tasks => [...tasks, updatedTask]);
+        save(meetingId, collabId, newSection, tasks => [...tasks, updatedTask]);
       } else {
-        updateMeetingSection(meetingId, collabId, sectionKey, tasks =>
+        save(meetingId, collabId, sectionKey, tasks =>
           tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
         );
       }
@@ -2041,7 +2023,8 @@ export default function App() {
     } else {
       // New task
       const newTask = { ...formData, id: genId(), history: [{ text: `Created by ${isTL ? "TL" : collab?.name}`, time: `Today ${now}` }] };
-      updateMeetingSection(meetingId, collabId, sectionKey, tasks => [...tasks, newTask]);
+      const save = isTL ? updateMeetingSection : updateMeetingSectionAndSave;
+      save(meetingId, collabId, sectionKey, tasks => [...tasks, newTask]);
     }
     setTaskModal(null);
   }
@@ -2049,7 +2032,8 @@ export default function App() {
   function handleDeleteTask(taskId) {
     if (!taskModal) return;
     const { collabId, sectionKey, meetingId } = taskModal;
-    updateMeetingSection(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== taskId));
+    const save = isTL ? updateMeetingSection : updateMeetingSectionAndSave;
+    save(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== taskId));
     setTaskModal(null);
   }
 
