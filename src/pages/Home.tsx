@@ -1841,8 +1841,8 @@ export default function App() {
     setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
 
-  // ── dataLoaded ref: prevents persisting empty data before load completes ──
-  const dataLoaded = useRef(false);
+  // ── dataLoaded state: prevents persisting empty data before load completes ──
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // ── Helper: load TL data via API (uses service_role key — bypasses RLS) ──
   async function loadTlData(tlId: string) {
@@ -1867,8 +1867,8 @@ export default function App() {
 
   // ── Initialize data on login ──
   useEffect(() => {
-    if (!loggedInUser) { dataLoaded.current = false; return; }
-    dataLoaded.current = false;
+    if (!loggedInUser) { setDataLoaded(false); return; }
+    setDataLoaded(false);
 
     (async () => {
       const tlId = loggedInUser.role === "TL"
@@ -1885,7 +1885,7 @@ export default function App() {
 
       if (!tlId) {
         console.warn("[SYNC] No tlId found — data will not load!");
-        dataLoaded.current = true;
+        setDataLoaded(true);
         return;
       }
 
@@ -1913,7 +1913,7 @@ export default function App() {
           }
         }
       }
-      dataLoaded.current = true;
+      setDataLoaded(true);
     })();
   }, [loggedInUser]);
 
@@ -1944,7 +1944,7 @@ export default function App() {
 
   // ── Persist data to Supabase whenever meetings change (TL and Collaborator) ──
   useEffect(() => {
-    if (!loggedInUser || !dataLoaded.current) return;
+    if (!loggedInUser || !dataLoaded) return;
 
     if (loggedInUser.role === "TL") {
       // TL saves everything (projects, collaborators, meetings)
@@ -2670,21 +2670,11 @@ export default function App() {
       ? getCollabsForProject(meeting.projectId)
       : (myCollabEntry ? [myCollabEntry] : []);
 
-    const isArchivedMeeting = !isTL && (() => {
-      const collab = myCollabEntry;
-      if (!collab || !collab.changeHistory || collab.changeHistory.length === 0) return false;
-      const changes = collab.changeHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
-      const firstChange = changes[0];
-      return meeting.date < firstChange.date;
-    })();
-
     function openAddTask(collabId, sectionKey) {
-      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task: { title: "", description: "", status: "Open", deadline: "" } });
     }
 
     function openEditTask(task, collabId, sectionKey) {
-      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task });
     }
 
