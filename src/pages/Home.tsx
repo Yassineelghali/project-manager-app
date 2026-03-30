@@ -1459,8 +1459,10 @@ function TaskCard({ task, onOpen, onDragStart, onDragEnd, isTL, collaborator }) 
 // ── SUBSECTION ──
 function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator }) {
   // Use a ref to persist open state across parent re-renders
-  const openRef = useRef(sectionKey !== "closed" && sectionKey !== "outside");
-  const [open, setOpenState] = useState(openRef.current);
+  //modif manuelle 
+  /*const openRef = useRef(sectionKey !== "closed" && sectionKey !== "outside");
+  const [open, setOpenState] = useState(openRef.current);*/
+  const [open, setOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
   const setOpen = (val: boolean | ((prev: boolean) => boolean)) => {
     const next = typeof val === "function" ? val(openRef.current) : val;
     openRef.current = next;
@@ -1978,11 +1980,12 @@ export default function App() {
     })();
   }, [loggedInUser]);
 
+  // modif manuelle 
   // ── Persist data to Supabase (TL only — triggered on data change, not auth change) ──
-  useEffect(() => {
+  /*useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
-  }, [projects, collaborators, meetings]); // intentionally exclude loggedInUser to avoid wipe on login
+  }, [projects, collaborators, meetings]); // intentionally exclude loggedInUser to avoid wipe on login*/
 
 
 
@@ -2041,14 +2044,17 @@ export default function App() {
   }
 
   // Execute pending save after render — outside React setter, no double-call issue
+  // modif manuelle
   useEffect(() => {
     if (!pendingSaveRef.current || isTL) return;
     const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
     if (!tlId) return;
+  
     const toSave = pendingSaveRef.current;
     pendingSaveRef.current = null;
+  
     saveTlData(tlId, { projects, collaborators, meetings: toSave });
-  });
+  }, [meetings]);
 
   function handleSaveTask(formData) {
     if (!taskModal) return;
