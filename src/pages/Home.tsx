@@ -380,7 +380,8 @@ const css = `
     transition: border-color 0.15s, transform 0.1s;
     cursor: pointer;
   }
-  .task-card:hover { border-color: var(--border2); transform: translateX(1px); }
+  .task-card:hover { border-color: var(--border2); }
+  .task-card { will-change: border-color; transition: border-color 0.1s; }
   .task-card.dragging { opacity: 0.5; }
   .task-main { flex: 1; min-width: 0; }
   .task-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
@@ -1457,10 +1458,13 @@ function TaskCard({ task, onOpen, onDragStart, onDragEnd, isTL, collaborator }) 
 }
 
 // ── SUBSECTION ──
-function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator }) {
-  const [open, setOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
+function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator, open: openProp, onToggle }) {
+  // If open/onToggle props are provided (from CollabSection), use them (controlled mode)
+  // Otherwise use local state (standalone mode)
+  const [localOpen, setLocalOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
+  const open = openProp !== undefined ? openProp : localOpen;
+  const handleToggle = onToggle || (() => setLocalOpen(o => !o));
   const [dragOver, setDragOver] = useState(false);
-  const [dragging, setDragging] = useState(null);
 
   return (
     <div className={`subsection ${dragOver ? "drop-zone" : ""}`}
@@ -1468,7 +1472,7 @@ function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL
       onDragLeave={isTL ? () => setDragOver(false) : undefined}
       onDrop={isTL ? (e) => { e.preventDefault(); setDragOver(false); onDropTask(e, sectionKey); } : undefined}
     >
-      <div className="subsection-head" onClick={() => setOpen(o => !o)}>
+      <div className="subsection-head" onClick={handleToggle}>
         <span className="subsection-icon">{SECTION_ICONS[sectionKey]}</span>
         <span className="subsection-label">{SECTION_LABELS[sectionKey]}</span>
         <span className="subsection-count">{tasks.length}</span>
@@ -1498,10 +1502,22 @@ function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL
 }
 
 // ── COLLABORATOR SECTION ──
+// openSections stored here (outside App) so it survives App() re-renders
 function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTask, isTL, projectColor, meetingId }) {
   const [expanded, setExpanded] = useState(true);
+  // Store open state per section key — survives parent re-renders
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    SECTION_KEYS.forEach(k => { init[k] = k !== "closed" && k !== "outside"; });
+    return init;
+  });
+
   const activeCount = (data.current?.length || 0) + (data.upcoming?.length || 0);
   const openPts = data.openPoints?.length || 0;
+
+  function toggleSection(k: string) {
+    setOpenSections(prev => ({ ...prev, [k]: !prev[k] }));
+  }
 
   return (
     <div className="collab-section">
@@ -1524,6 +1540,8 @@ function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTas
               key={`${collab.id}-${k}`}
               sectionKey={k}
               tasks={data[k] || []}
+              open={openSections[k]}
+              onToggle={() => toggleSection(k)}
               onOpenTask={onOpenTask}
               onAddTask={(sKey) => onAddTask(collab.id, sKey)}
               onDropTask={(e, toSection) => onDropTask(e, collab.id, toSection)}
