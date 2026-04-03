@@ -1502,21 +1502,19 @@ function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL
 }
 
 // ── COLLABORATOR SECTION ──
-// openSections stored here (outside App) so it survives App() re-renders
+// Uses module-level sectionOpenState map — survives React remounts completely
 function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTask, isTL, projectColor, meetingId }) {
   const [expanded, setExpanded] = useState(true);
-  // Store open state per section key — survives parent re-renders
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    SECTION_KEYS.forEach(k => { init[k] = k !== "closed" && k !== "outside"; });
-    return init;
-  });
+  // Local tick to force re-render when section toggled (without storing open state in React)
+  const [, forceUpdate] = useState(0);
 
   const activeCount = (data.current?.length || 0) + (data.upcoming?.length || 0);
   const openPts = data.openPoints?.length || 0;
 
   function toggleSection(k: string) {
-    setOpenSections(prev => ({ ...prev, [k]: !prev[k] }));
+    const current = getSectionOpen(collab.id, k);
+    setSectionOpen(collab.id, k, !current);
+    forceUpdate(n => n + 1); // trigger re-render to show new open state
   }
 
   return (
@@ -1540,7 +1538,7 @@ function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTas
               key={`${collab.id}-${k}`}
               sectionKey={k}
               tasks={data[k] || []}
-              open={openSections[k]}
+              open={getSectionOpen(collab.id, k)}
               onToggle={() => toggleSection(k)}
               onOpenTask={onOpenTask}
               onAddTask={(sKey) => onAddTask(collab.id, sKey)}
@@ -1801,6 +1799,23 @@ function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
   );
 }
 
+// ─── MODULE-LEVEL STATE (survives React re-renders and component remounts) ───
+// Stores open/closed state of subsections by key — never reset by React
+const sectionOpenState: Map<string, boolean> = new Map();
+
+function getSectionOpen(collabId: string, sectionKey: string): boolean {
+  const key = `${collabId}-${sectionKey}`;
+  if (!sectionOpenState.has(key)) {
+    // Default: open for current/upcoming/openPoints, closed for closed/outside
+    sectionOpenState.set(key, sectionKey !== 'closed' && sectionKey !== 'outside');
+  }
+  return sectionOpenState.get(key)!;
+}
+
+function setSectionOpen(collabId: string, sectionKey: string, val: boolean) {
+  sectionOpenState.set(`${collabId}-${sectionKey}`, val);
+}
+
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -1842,7 +1857,7 @@ export default function App() {
         setLoggedInUser(null);
         setAuthChecked(true);
       }
-      // Do NOT auto-login on SIGNED_IN — user must log in manually
+      // SIGNED_IN: do nothing — manual login only. No auto-login from session events.
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1901,7 +1916,7 @@ export default function App() {
     setUserMenuOpen(false);
     setShowAccountModal(false);
     // Sign out from Supabase — clears session so getSession() won't auto-restore
-    supabase.auth.signOut();
+    supabase.auth.signOut().catch(() => {});
   }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
