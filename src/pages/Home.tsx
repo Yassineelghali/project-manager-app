@@ -2330,17 +2330,13 @@ export default function App() {
                         </div>
                         <button className="btn btn-ghost btn-xs" onClick={async () => {
                           try {
-                            if (c.invitationToken) { const link=`${window.location.origin}?invite=${c.invitationToken}`; await navigator.clipboard.writeText(link); alert("Lien copié !
-
-"+link); return; }
+                            if (c.invitationToken) { const link=`${window.location.origin}?invite=${c.invitationToken}`; await navigator.clipboard.writeText(link); alert("Lien copié !\n\n"+link); return; }
                             const res = await fetch('/api/invitations/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email:c.email, subprojectId:c.subprojectId, tlId:loggedInUser.id }) });
                             const data = await res.json();
                             if (!res.ok) { alert("Erreur: "+(data.error||"impossible")); return; }
                             setCollaborators(prev => prev.map(col => col.id===c.id ? {...col, invitationToken: data.token} : col));
                             const link=`${window.location.origin}?invite=${data.token}`;
-                            await navigator.clipboard.writeText(link); alert("Lien copié !
-
-"+link);
+                            await navigator.clipboard.writeText(link); alert("Lien copié !\n\n"+link);
                           } catch { alert("Erreur lors de la génération du lien."); }
                         }}>📋 Copy Link</button>
                       </div>
