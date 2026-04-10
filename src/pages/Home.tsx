@@ -1771,8 +1771,9 @@ export default function App() {
   }
   function handleLogout() {
     supabase.auth.signOut().catch(() => {});
+    dataLoadedRef.current = false;
     setLoggedInUser(null); setProjects([]); setCollaborators([]); setMeetings([]);
-    setDataLoaded(false); setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false);
+    setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false);
   }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
@@ -1780,8 +1781,8 @@ export default function App() {
     setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
 
-  // ── dataLoaded: prevents saving empty data before load completes ──
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // ── dataLoadedRef: synchronous flag to block saves during initial load ──
+  const dataLoadedRef = { current: false };
 
   // ── Helper: load TL data from API ──
   async function loadTlData(tlId: string) {
@@ -1795,17 +1796,18 @@ export default function App() {
   // ── Helper: save TL data to API ──
   async function saveTlData(tlId: string, data: any): Promise<void> {
     try {
-      await fetch(`/api/tl-data/${tlId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const res = await fetch(`/api/tl-data/${tlId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (!res.ok) console.error('[SAVE] failed:', await res.text());
     } catch (e) { console.error('[SAVE] error:', e); }
   }
 
   // ── Initialize data on login ──
   useEffect(() => {
-    if (!loggedInUser) { setDataLoaded(false); return; }
-    setDataLoaded(false);
+    if (!loggedInUser) { dataLoadedRef.current = false; return; }
+    dataLoadedRef.current = false; // block saves during load
     (async () => {
       const tlId = loggedInUser.role === "TL" ? loggedInUser.id : (loggedInUser.tlId || loggedInUser.tl_id);
-      if (!tlId) { setDataLoaded(true); return; }
+      if (!tlId) { dataLoadedRef.current = true; return; }
       const data = await loadTlData(tlId);
       if (data) {
         setProjects(data.projects || []);
@@ -1816,13 +1818,13 @@ export default function App() {
           if (mc) setLoggedInUser((u: any) => ({ ...u, collabId: mc.id, resolvedCollabId: mc.id }));
         }
       }
-      setDataLoaded(true);
+      dataLoadedRef.current = true; // now allow saves
     })();
   }, [loggedInUser]);
 
-  // ── Persist TL data whenever it changes ──
+  // ── Persist TL data whenever projects/collaborators/meetings change ──
   useEffect(() => {
-    if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
+    if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoadedRef.current) return;
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings]);
 
@@ -1868,6 +1870,7 @@ export default function App() {
   }
 
   function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t:any[])=>any[]) {
+    if (!dataLoadedRef.current) return updateMeetingSection(meetingId, collabId, sectionKey, updater);
     const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
     const currentProjects = projects; const currentCollabs = collaborators;
     setMeetings(prev => {
