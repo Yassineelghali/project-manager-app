@@ -1698,6 +1698,9 @@ function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
   );
 }
 
+// ─── MODULE-LEVEL: flags that must survive React re-renders ─────────────────
+const dataLoadedRef = { current: false };
+
 // ─── MODULE-LEVEL: section open state survives all React re-renders ───────────
 const _sectionOpen: Map<string, boolean> = new Map();
 const getSectionOpen = (cid: string, k: string) => { const key=`${cid}-${k}`; if(!_sectionOpen.has(key)) _sectionOpen.set(key, k!=="closed"&&k!=="outside"); return _sectionOpen.get(key)!; };
@@ -1781,8 +1784,7 @@ export default function App() {
     setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
 
-  // ── dataLoadedRef: synchronous flag to block saves during initial load ──
-  const dataLoadedRef = { current: false };
+  // dataLoadedRef is module-level (see below App function)
 
   // ── Helper: load TL data from API ──
   async function loadTlData(tlId: string) {
@@ -1809,6 +1811,7 @@ export default function App() {
       const tlId = loggedInUser.role === "TL" ? loggedInUser.id : (loggedInUser.tlId || loggedInUser.tl_id);
       if (!tlId) { dataLoadedRef.current = true; return; }
       const data = await loadTlData(tlId);
+      console.log("[LOAD] from Supabase:", data ? { projects: data.projects?.length, collaborators: data.collaborators?.length, meetings: data.meetings?.length } : "NULL");
       if (data) {
         setProjects(data.projects || []);
         setCollaborators(data.collaborators || []);
@@ -1818,13 +1821,16 @@ export default function App() {
           if (mc) setLoggedInUser((u: any) => ({ ...u, collabId: mc.id, resolvedCollabId: mc.id }));
         }
       }
-      dataLoadedRef.current = true; // now allow saves
+      dataLoadedRef.current = true;
+      console.log("[LOAD] complete — saves now enabled");
     })();
   }, [loggedInUser]);
 
   // ── Persist TL data whenever projects/collaborators/meetings change ──
   useEffect(() => {
-    if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoadedRef.current) return;
+    if (!loggedInUser || loggedInUser.role !== "TL") return;
+    if (!dataLoadedRef.current) { console.log("[SAVE] blocked — data not loaded yet"); return; }
+    console.log("[SAVE] saving to Supabase:", { projects: projects.length, collaborators: collaborators.length, meetings: meetings.length, tlId: loggedInUser.id });
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings]);
 
