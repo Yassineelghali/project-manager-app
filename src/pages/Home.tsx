@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { signIn, signUp, getCurrentUser, supabase } from "@/lib/supabaseAuth";
-import { createInvitationToken as createSupabaseInvite, getInvitationByToken as getSupabaseInvite, acceptInvitation as acceptSupabaseInvite } from "@/lib/invitationService";
+import { useState, useEffect, useCallback } from "react";
+import { signIn, signUp, supabase } from "@/lib/supabaseAuth";
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────────────
 
@@ -381,7 +380,7 @@ const css = `
     cursor: pointer;
   }
   .task-card:hover { border-color: var(--border2); }
-  .task-card { will-change: border-color; transition: border-color 0.1s; }
+  .task-card { transition: border-color 0.1s; }
   .task-card.dragging { opacity: 0.5; }
   .task-main { flex: 1; min-width: 0; }
   .task-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
@@ -773,12 +772,12 @@ initializeInvitationTokens();
 // ─── USERS DATABASE (mock) ───────────────────────────────────────────────────
 
 const USERS_DB = [
-  { id: "tl1", name: "Marie Leclerc", initials: "ML", email: "m.leclerc@weektrack.io", role: "TL", password: "tl1234", color: "#00A8CC", department: "Engineering", team: "Powertrain Team", join_date: "2023-06-01", collabId: null },
-  { id: "tl2", name: "Thomas Bernard", initials: "TB", email: "t.bernard@weektrack.io", role: "TL", password: "tl5678", color: "#2E5EAA", department: "Engineering", team: "ADAS Team", join_date: "2022-11-15", collabId: null },
-  { id: "c1",  name: "Yassine Mansouri", initials: "YM", email: "y.mansouri@weektrack.io", role: "Collaborator", password: "collab1", color: "#64B4DC", department: "Powertrain ECU", team: "Powertrain Team", join_date: "2024-01-15", collabId: "c1" },
-  { id: "c2",  name: "Inès Boudali", initials: "IB", email: "i.boudali@weektrack.io", role: "Collaborator", password: "collab2", color: "#1DD3B0", department: "Powertrain ECU", team: "Powertrain Team", join_date: "2024-03-05", collabId: "c2" },
-  { id: "c3",  name: "Karim Sefrioui", initials: "KS", email: "k.sefrioui@weektrack.io", role: "Collaborator", password: "collab3", color: "#2E5EAA", department: "ADAS Integration", team: "ADAS Team", join_date: "2025-01-10", collabId: "c3" },
-  { id: "c4",  name: "Lina Ouhabi", initials: "LO", email: "l.ouhabi@weektrack.io", role: "Collaborator", password: "collab4", color: "#64B4DC", department: "ADAS Integration", team: "ADAS Team", join_date: "2025-01-20", collabId: "c4" },
+  { id: "tl1", name: "Marie Leclerc", initials: "ML", email: "m.leclerc@weektrack.io", role: "TL", password: "tl1234", color: "#00A8CC", department: "Engineering", team: "Powertrain Team", joinDate: "2023-06-01", collabId: null },
+  { id: "tl2", name: "Thomas Bernard", initials: "TB", email: "t.bernard@weektrack.io", role: "TL", password: "tl5678", color: "#2E5EAA", department: "Engineering", team: "ADAS Team", joinDate: "2022-11-15", collabId: null },
+  { id: "c1",  name: "Yassine Mansouri", initials: "YM", email: "y.mansouri@weektrack.io", role: "Collaborator", password: "collab1", color: "#64B4DC", department: "Powertrain ECU", team: "Powertrain Team", joinDate: "2024-01-15", collabId: "c1" },
+  { id: "c2",  name: "Inès Boudali", initials: "IB", email: "i.boudali@weektrack.io", role: "Collaborator", password: "collab2", color: "#1DD3B0", department: "Powertrain ECU", team: "Powertrain Team", joinDate: "2024-03-05", collabId: "c2" },
+  { id: "c3",  name: "Karim Sefrioui", initials: "KS", email: "k.sefrioui@weektrack.io", role: "Collaborator", password: "collab3", color: "#2E5EAA", department: "ADAS Integration", team: "ADAS Team", joinDate: "2025-01-10", collabId: "c3" },
+  { id: "c4",  name: "Lina Ouhabi", initials: "LO", email: "l.ouhabi@weektrack.io", role: "Collaborator", password: "collab4", color: "#64B4DC", department: "ADAS Integration", team: "ADAS Team", joinDate: "2025-01-20", collabId: "c4" },
 ];
 
 // ─── LOGIN SCREEN ────────────────────────────────────────────────────────────
@@ -801,21 +800,11 @@ function LoginScreen({ onLogin }) {
     (async () => {
       try {
         const res = await fetch(`/api/invitations/${token}`);
-        if (!res.ok) {
-          setError("Le lien d'invitation est invalide. Veuillez demander un nouveau lien au Team Leader.");
-          return;
-        }
-        const invitation = await res.json();
-        if (invitation.acceptedAt) {
-          setError("Ce lien d'invitation a déjà été utilisé. Veuillez vous connecter avec votre compte.");
-        } else {
-          setInvitationData({ token, ...invitation });
-          setEmail(invitation.email);
-          setMode("signup");
-        }
-      } catch {
-        setError("Erreur lors de la vérification de l'invitation.");
-      }
+        if (!res.ok) { setError("Le lien d'invitation est invalide."); return; }
+        const inv = await res.json();
+        if (inv.acceptedAt) { setError("Ce lien a déjà été utilisé. Veuillez vous connecter."); }
+        else { setInvitationData({ token, ...inv }); setEmail(inv.email); setMode("signup"); }
+      } catch { setError("Erreur lors de la vérification de l'invitation."); }
     })();
   }, []);
   
@@ -834,49 +823,24 @@ function LoginScreen({ onLogin }) {
 
   function handleLogin(e) {
     e && e.preventDefault();
-    setError("");
-    setLoading(true);
+    setError(""); setLoading(true);
     (async () => {
-      // 1. Authenticate via Supabase Auth
       const authResult = await signIn(email, password);
       if (!authResult.success) {
+        const demo = USERS_DB.find(u => u.email === email && u.password === password);
+        if (demo) { onLogin(demo); setLoading(false); return; }
         setError("Identifiants incorrects. Vérifiez votre email et mot de passe.");
-        setLoading(false);
-        return;
+        setLoading(false); return;
       }
-      // 2. Fetch full user profile from 'users' table
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
+      const { data: profile } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
       if (profile) {
-        const userProfile = {
-          ...profile,
-          collabId: profile.collab_id,
-          tlId: profile.tl_id,
-          subprojectId: profile.subproject_id,
-          joinDate: profile.join_date,
-          initials: profile.name?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)
-        };
-        console.log("[LOGIN] Profile from Supabase:", userProfile);
-        onLogin(userProfile);
+        onLogin({ ...profile, collabId: profile.collab_id, tlId: profile.tl_id, subprojectId: profile.subproject_id, joinDate: profile.join_date, initials: profile.name?.split(" ").map((w: string)=>w[0]).join("").toUpperCase().slice(0,2) });
       } else {
-        // No profile row — read role from Supabase Auth metadata (saved at signup)
         const meta = authResult.user?.user_metadata || {};
-        const name = meta.name || email;
-        const role = meta.role || 'TL';
-        const initials = name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
-        const userId = authResult.user?.id || `user_${Date.now()}`;
-        // Create the missing profile row on-the-fly
-        await supabase.from('users').upsert([{
-          id: userId, name, email, role,
-          department: meta.department || '',
-          team: meta.team || '',
-          join_date: new Date().toISOString(),
-          collabId: role === 'Collaborator' ? userId : null
-        }]);
-        onLogin({ id: userId, email, name, role, initials, collabId: role === 'Collaborator' ? userId : null });
+        const name = meta.name || email; const role = meta.role || 'TL';
+        const uid = authResult.user?.id || `user_${Date.now()}`;
+        await supabase.from('users').upsert([{ id: uid, name, email, role, department: meta.department||'', team: meta.team||'', join_date: new Date().toISOString() }]);
+        onLogin({ id: uid, email, name, role, initials: name[0].toUpperCase(), collabId: null, tlId: null });
       }
       setLoading(false);
     })();
@@ -885,8 +849,9 @@ function LoginScreen({ onLogin }) {
   function handleSignup(e) {
     e && e.preventDefault();
     setError("");
-
+    
     // Validation
+    // If invited, email is auto-filled so skip email validation
     const emailRequired = !invitationData;
     if (!signupForm.name || (emailRequired && !signupForm.email) || !signupForm.password || !signupForm.team) {
       setError("Tous les champs obligatoires doivent être remplis");
@@ -900,93 +865,34 @@ function LoginScreen({ onLogin }) {
       setError("Le mot de passe doit contenir au moins 6 caractères");
       return;
     }
+    if (USERS_DB.find(u => u.email === signupForm.email)) {
+      setError("Cet email est déjà utilisé");
+      return;
+    }
 
     setLoading(true);
     (async () => {
       try {
         const userEmail = invitationData?.email || signupForm.email;
-        const initials = signupForm.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+        const initials = signupForm.name.split(" ").map((w: string)=>w[0]).join("").toUpperCase().slice(0,2);
 
         if (invitationData?.token) {
-          // ── Path A: Collaborator invited by TL ──
-          // Use the server endpoint that links the user to the TL & subproject
-          const res = await fetch('/api/users/create-from-invitation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: invitationData.token,
-              name: signupForm.name,
-              password: signupForm.password,
-              department: signupForm.department,
-              team: signupForm.team
-            })
-          });
+          // Collaborator from invitation
+          const res = await fetch('/api/users/create-from-invitation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: invitationData.token, name: signupForm.name, password: signupForm.password, department: signupForm.department, team: signupForm.team }) });
           const data = await res.json();
           if (!res.ok) { setError(data.error || "Erreur lors de la création du compte"); setLoading(false); return; }
-
-          // Also register in Supabase Auth so signIn works later
-          await signUp(userEmail, signupForm.password, { name: signupForm.name });
-
-          const newUser = {
-            id: data.userId,
-            name: signupForm.name,
-            initials,
-            email: userEmail,
-            role: 'Collaborator',
-            color: signupForm.color || "#64B4DC",
-            department: signupForm.department || "General",
-            team: signupForm.team,
-            join_date: today(),
-            collabId: data.collabId,
-            tlId: data.tlId,
-            subprojectId: data.subprojectId
-          };
-          onLogin(newUser);
-
+          await signUp(userEmail, signupForm.password, { name: signupForm.name, role: 'Collaborator' });
+          onLogin({ id: data.userId, name: signupForm.name, initials, email: userEmail, role: 'Collaborator', color: '#64B4DC', department: signupForm.department||'', team: signupForm.team, joinDate: today(), collabId: data.collabId, tlId: data.tlId, subprojectId: data.subprojectId });
         } else {
-          // ── Path B: TL self-signup ──
-          // 1. Create profile in public.users FIRST
-          const res = await fetch('/api/users/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: signupForm.name,
-              email: userEmail,
-              password: signupForm.password,
-              role: signupForm.role,
-              department: signupForm.department,
-              team: signupForm.team
-            })
-          });
+          // TL self-signup — create profile first, then Supabase Auth
+          const res = await fetch('/api/users/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: signupForm.name, email: userEmail, password: signupForm.password, role: signupForm.role, department: signupForm.department, team: signupForm.team }) });
           const data = await res.json();
           if (!res.ok) { setError(data.error || "Erreur lors de la création du compte"); setLoading(false); return; }
-
-          // 2. Register in Supabase Auth with role in metadata so login always knows the role
-          const authResult = await signUp(userEmail, signupForm.password, {
-            name: signupForm.name,
-            role: signupForm.role,
-            department: signupForm.department,
-            team: signupForm.team
-          });
-          if (!authResult.success) { setError(authResult.error || "Erreur lors de la création du compte"); setLoading(false); return; }
-
-          const newUser = {
-            id: data.userId,
-            name: signupForm.name,
-            initials,
-            email: userEmail,
-            role: signupForm.role,
-            color: signupForm.color || "#00A8CC",
-            department: signupForm.department || "General",
-            team: signupForm.team,
-            join_date: today(),
-            collabId: signupForm.role === "Collaborator" ? genId() : null
-          };
-          onLogin(newUser);
+          const authResult = await signUp(userEmail, signupForm.password, { name: signupForm.name, role: signupForm.role, department: signupForm.department, team: signupForm.team });
+          if (!authResult.success) { setError(authResult.error || "Erreur auth"); setLoading(false); return; }
+          onLogin({ id: data.userId, name: signupForm.name, initials, email: userEmail, role: signupForm.role, color: '#00A8CC', department: signupForm.department||'', team: signupForm.team, joinDate: today(), collabId: null, tlId: null });
         }
-      } catch (err) {
-        setError("Erreur réseau. Vérifiez votre connexion.");
-      }
+      } catch { setError("Erreur réseau. Vérifiez votre connexion."); }
       setLoading(false);
     })();
   }
@@ -1075,12 +981,11 @@ function LoginScreen({ onLogin }) {
               Pas encore de compte ? <button onClick={() => setMode("signup")} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", textDecoration: "underline", fontSize: 12 }}>Créer un compte</button>
             </div>
 
-            {/* Demo accounts hidden in production */}
-            {false && <div className="login-divider">comptes demo</div>}
+            <div className="login-divider">comptes demo</div>
 
             <div className="demo-label">Cliquez pour vous connecter rapidement</div>
             <div className="demo-accounts">
-              {window.location.hostname === 'localhost' && USERS_DB.slice(0, 6).map(u => (
+              {window.location.hostname === "localhost" && USERS_DB.slice(0, 6).map(u => (
                 <div key={u.id} className="demo-card" onClick={() => quickLogin(u)}>
                   <div className="avatar" style={{ width: 30, height: 30, background: u.color + "22", color: u.color, border: `1.5px solid ${u.color}44`, fontSize: 10, fontFamily: "var(--mono)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {u.initials}
@@ -1315,7 +1220,7 @@ function AccountModal({ user, notifications, meetings, collaborators, onClose, o
                     { label: "Département", value: user.department },
                     { label: "Équipe", value: user.team },
                     { label: "Rôle", value: user.role === "TL" ? "Team Leader" : "Collaborateur" },
-                    { label: "Membre depuis", value: new Date(user.join_date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) },
+                    { label: "Membre depuis", value: new Date(user.joinDate).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) },
                   ].map(f => (
                     <div key={f.label} className="account-field">
                       <span className="account-field-label">{f.label}</span>
@@ -1459,8 +1364,6 @@ function TaskCard({ task, onOpen, onDragStart, onDragEnd, isTL, collaborator }) 
 
 // ── SUBSECTION ──
 function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL, collaborator, open: openProp, onToggle }) {
-  // If open/onToggle props are provided (from CollabSection), use them (controlled mode)
-  // Otherwise use local state (standalone mode)
   const [localOpen, setLocalOpen] = useState(sectionKey !== "closed" && sectionKey !== "outside");
   const open = openProp !== undefined ? openProp : localOpen;
   const handleToggle = onToggle || (() => setLocalOpen(o => !o));
@@ -1502,19 +1405,15 @@ function Subsection({ sectionKey, tasks, onOpenTask, onAddTask, onDropTask, isTL
 }
 
 // ── COLLABORATOR SECTION ──
-// Uses module-level sectionOpenState map — survives React remounts completely
 function CollabSection({ collab, data, project, onOpenTask, onAddTask, onDropTask, isTL, projectColor, meetingId }) {
   const [expanded, setExpanded] = useState(true);
-  // Local tick to force re-render when section toggled (without storing open state in React)
   const [, forceUpdate] = useState(0);
-
   const activeCount = (data.current?.length || 0) + (data.upcoming?.length || 0);
   const openPts = data.openPoints?.length || 0;
 
   function toggleSection(k: string) {
-    const current = getSectionOpen(collab.id, k);
-    setSectionOpen(collab.id, k, !current);
-    forceUpdate(n => n + 1); // trigger re-render to show new open state
+    setSectionOpen(collab.id, k, !getSectionOpen(collab.id, k));
+    forceUpdate(n => n + 1);
   }
 
   return (
@@ -1799,65 +1698,31 @@ function CollabFormModal({ collab, subprojects, projects, onSave, onClose }) {
   );
 }
 
-// ─── MODULE-LEVEL STATE (survives React re-renders and component remounts) ───
-// Stores open/closed state of subsections by key — never reset by React
-const sectionOpenState: Map<string, boolean> = new Map();
-
-function getSectionOpen(collabId: string, sectionKey: string): boolean {
-  const key = `${collabId}-${sectionKey}`;
-  if (!sectionOpenState.has(key)) {
-    // Default: open for current/upcoming/openPoints, closed for closed/outside
-    sectionOpenState.set(key, sectionKey !== 'closed' && sectionKey !== 'outside');
-  }
-  return sectionOpenState.get(key)!;
-}
-
-function setSectionOpen(collabId: string, sectionKey: string, val: boolean) {
-  sectionOpenState.set(`${collabId}-${sectionKey}`, val);
-}
+// ─── MODULE-LEVEL: section open state survives all React re-renders ───────────
+const _sectionOpen: Map<string, boolean> = new Map();
+const getSectionOpen = (cid: string, k: string) => { const key=`${cid}-${k}`; if(!_sectionOpen.has(key)) _sectionOpen.set(key, k!=="closed"&&k!=="outside"); return _sectionOpen.get(key)!; };
+const setSectionOpen = (cid: string, k: string, v: boolean) => _sectionOpen.set(`${cid}-${k}`, v);
 
 // ─── MAIN APP ───────────────────────────────────────────────────────────────
 
 export default function App() {
   // ── AUTH STATE ──
-  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // ── AUTH: restore session on mount + listen for changes ──
+  // ── Auth session restore ──
   useEffect(() => {
-    // Check if Supabase has an active session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        // Fetch profile from public.users
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', session.user.email)
-          .maybeSingle();
-        if (profile) {
-          const initials = profile.name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
-          setLoggedInUser({
-            ...profile,
-            collabId: profile.collab_id,
-            tlId: profile.tl_id,
-            subprojectId: profile.subproject_id,
-            joinDate: profile.join_date,
-            initials
-          });
-        }
+        const { data: profile } = await supabase.from('users').select('*').eq('email', session.user.email).maybeSingle();
+        if (profile) setLoggedInUser({ ...profile, collabId: profile.collab_id, tlId: profile.tl_id, initials: profile.name?.split(' ').map((w: string)=>w[0]).join('').toUpperCase().slice(0,2) });
       }
       setAuthChecked(true);
     });
-
-    // Listen for auth changes (logout, session expiry)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
-        setLoggedInUser(null);
-        setAuthChecked(true);
-      }
-      // SIGNED_IN: do nothing — manual login only. No auto-login from session events.
+      if (event === 'SIGNED_OUT') { setLoggedInUser(null); setAuthChecked(true); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1891,7 +1756,6 @@ export default function App() {
   // ── Derived from auth ──
   const role = loggedInUser?.role || "TL";
   const currentUser = loggedInUser || {};
-  // Use resolvedCollabId (matched by email from TL's collaborators array) or fallback to collabId
   const collabUserId = loggedInUser?.resolvedCollabId || loggedInUser?.collabId || "c1";
   const isTL = role === "TL";
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -1906,17 +1770,9 @@ export default function App() {
     }
   }
   function handleLogout() {
-    // Clear app state immediately
-    setLoggedInUser(null);
-    setProjects([]);
-    setCollaborators([]);
-    setMeetings([]);
-    setDataLoaded(false);
-    setView("dashboard");
-    setUserMenuOpen(false);
-    setShowAccountModal(false);
-    // Sign out from Supabase — clears session so getSession() won't auto-restore
     supabase.auth.signOut().catch(() => {});
+    setLoggedInUser(null); setProjects([]); setCollaborators([]); setMeetings([]);
+    setDataLoaded(false); setView("dashboard"); setUserMenuOpen(false); setShowAccountModal(false);
   }
   function handleSaveAccount(form) {
     // Calculate new initials from the name
@@ -1924,97 +1780,54 @@ export default function App() {
     setLoggedInUser(u => ({ ...u, name: form.name, email: form.email, department: form.department, team: form.team, initials: newInitials }));
   }
 
-  // ── dataLoaded state: prevents persisting empty data before load completes ──
+  // ── dataLoaded: prevents saving empty data before load completes ──
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // ── Helper: load TL data via API (uses service_role key — bypasses RLS) ──
+  // ── Helper: load TL data from API ──
   async function loadTlData(tlId: string) {
     try {
       const res = await fetch(`/api/tl-data/${tlId}`);
       if (!res.ok) return null;
-      const json = await res.json();
-      return json.data;
+      return (await res.json()).data;
     } catch { return null; }
   }
 
-  // ── Helper: save TL data via API ──
+  // ── Helper: save TL data to API ──
   async function saveTlData(tlId: string, data: any): Promise<void> {
     try {
-      const res = await fetch(`/api/tl-data/${tlId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('[SAVE] Error:', err);
-      }
-    } catch (e) {
-      console.error('[SAVE] Network error:', e);
-    }
+      await fetch(`/api/tl-data/${tlId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    } catch (e) { console.error('[SAVE] error:', e); }
   }
 
   // ── Initialize data on login ──
   useEffect(() => {
     if (!loggedInUser) { setDataLoaded(false); return; }
     setDataLoaded(false);
-
     (async () => {
-      const tlId = loggedInUser.role === "TL"
-        ? loggedInUser.id
-        : (loggedInUser.tlId || loggedInUser.tl_id);
-
-      console.log("[SYNC] Login:", {
-        role: loggedInUser.role,
-        id: loggedInUser.id,
-        tlId: loggedInUser.tlId,
-        tl_id: loggedInUser.tl_id,
-        resolvedTlId: tlId
-      });
-
-      if (!tlId) {
-        console.warn("[SYNC] No tlId found — data will not load!");
-        setDataLoaded(true);
-        return;
-      }
-
-      console.log("[SYNC] Loading data from /api/tl-data/" + tlId);
+      const tlId = loggedInUser.role === "TL" ? loggedInUser.id : (loggedInUser.tlId || loggedInUser.tl_id);
+      if (!tlId) { setDataLoaded(true); return; }
       const data = await loadTlData(tlId);
-      console.log("[SYNC] Data received:", data ? `${data.projects?.length} projects, ${data.meetings?.length} meetings` : "NULL");
-
       if (data) {
         setProjects(data.projects || []);
         setCollaborators(data.collaborators || []);
         setMeetings(data.meetings || []);
-
-        // For collaborators: resolve the real collabId from the collaborators array by email
-        // The TL assigned a local id (e.g. "u8aa0ki") which is the key used in meeting sections
         if (loggedInUser.role !== "TL") {
-          const matchingCollab = (data.collaborators || []).find(
-            (c: any) => c.email === loggedInUser.email
-          );
-          if (matchingCollab) {
-            console.log("[SYNC] Resolved collabId from collaborators array:", matchingCollab.id);
-            // Update the logged-in user with the correct collabId
-            setLoggedInUser((u: any) => ({ ...u, collabId: matchingCollab.id, resolvedCollabId: matchingCollab.id }));
-          } else {
-            console.warn("[SYNC] No matching collaborator found for email:", loggedInUser.email);
-          }
+          const mc = (data.collaborators || []).find((col: any) => col.email === loggedInUser.email);
+          if (mc) setLoggedInUser((u: any) => ({ ...u, collabId: mc.id, resolvedCollabId: mc.id }));
         }
       }
       setDataLoaded(true);
     })();
   }, [loggedInUser]);
 
-  // ── Persist data to Supabase (TL only) ──
+  // ── Persist TL data whenever it changes ──
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "TL" || !dataLoaded) return;
     saveTlData(loggedInUser.id, { projects, collaborators, meetings });
   }, [projects, collaborators, meetings]);
 
-  // ── ALL hooks declared above — conditional returns MUST come after all hooks ──
-  if (!authChecked) return <><style>{css}</style><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text3)', fontSize: 14 }}>Chargement…</div></>;
-
+  // ── Show login screen if not authenticated ──
+  if (!authChecked) return <><style>{css}</style><div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'var(--text3)',fontSize:14 }}>Chargement…</div></>;
   if (!loggedInUser) return (<><style>{css}</style><LoginScreen onLogin={handleLogin} /></>);
 
 
@@ -2039,13 +1852,13 @@ export default function App() {
   // ── Meeting operations ──
   function getMeeting(id) { return meetings.find(m => m.id === id); }
 
-  function applyMeetingUpdate(prev: any[], meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
+  function applyMeetingUpdate(prev: any[], meetingId: string, collabId: string, sectionKey: string, updater: (t:any[])=>any[]) {
     return prev.map(m => {
       if (m.id !== meetingId) return m;
       const sections = { ...m.sections };
-      const collabSec = { ...(sections[collabId] || {}) };
-      collabSec[sectionKey] = updater(collabSec[sectionKey] || []);
-      sections[collabId] = collabSec;
+      const cs = { ...(sections[collabId] || {}) };
+      cs[sectionKey] = updater(cs[sectionKey] || []);
+      sections[collabId] = cs;
       return { ...m, sections };
     });
   }
@@ -2054,23 +1867,12 @@ export default function App() {
     setMeetings(prev => applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater));
   }
 
-  // pendingSave: stores the latest meetings to save after React finishes rendering
-  function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t: any[]) => any[]) {
+  function updateMeetingSectionAndSave(meetingId: string, collabId: string, sectionKey: string, updater: (t:any[])=>any[]) {
     const tlId = loggedInUser?.tlId || loggedInUser?.tl_id;
-    // Capture current values BEFORE the setState call
-    const currentProjects = projects;
-    const currentCollabs = collaborators;
+    const currentProjects = projects; const currentCollabs = collaborators;
     setMeetings(prev => {
       const updated = applyMeetingUpdate(prev, meetingId, collabId, sectionKey, updater);
-      if (tlId) {
-        setTimeout(() => {
-          saveTlData(tlId, {
-            projects: currentProjects,
-            collaborators: currentCollabs,
-            meetings: updated
-          });
-        }, 0);
-      }
+      if (tlId) setTimeout(() => saveTlData(tlId, { projects: currentProjects, collaborators: currentCollabs, meetings: updated }), 0);
       return updated;
     });
   }
@@ -2092,28 +1894,20 @@ export default function App() {
       const histEntry = changes.length > 0 ? { text: `${!isTL ? (collab?.name || "Collaborator") : "TL"} — ${changes.join(", ")}`, time: `Today ${now}` } : null;
       const updatedTask = { ...originalTask, ...formData, history: [...(originalTask.history || []), ...(histEntry ? [histEntry] : [])] };
 
-      // Auto-categorize: move task to appropriate section based on status
-      // Collaborator can freely move between sections — only auto-move on explicit status changes
       let newSection = sectionKey;
       if (formData.status === "Closed") newSection = "closed";
       else if (formData.status === "Ongoing") newSection = "current";
-      // Open status: keep in current section — don't force to upcoming
+      // Open: keep in current section
 
       const save = isTL ? updateMeetingSection : updateMeetingSectionAndSave;
-
       if (newSection !== sectionKey) {
         updateMeetingSection(meetingId, collabId, sectionKey, tasks => tasks.filter(t => t.id !== updatedTask.id));
         save(meetingId, collabId, newSection, tasks => [...tasks, updatedTask]);
       } else {
-        save(meetingId, collabId, sectionKey, tasks =>
-          tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
-        );
+        save(meetingId, collabId, sectionKey, tasks => tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
       }
-      if (!isTL && changes.length > 0) {
-        addNotification(`<strong>${collab?.name}</strong> ${changes.join(", ")} on <em>${formData.title}</em>`, "✏");
-      }
+      if (!isTL && changes.length > 0) addNotification(`<strong>${collab?.name}</strong> ${changes.join(", ")} on <em>${formData.title}</em>`, "✏");
     } else {
-      // New task
       const newTask = { ...formData, id: genId(), history: [{ text: `Created by ${isTL ? "TL" : collab?.name}`, time: `Today ${now}` }] };
       const save = isTL ? updateMeetingSection : updateMeetingSectionAndSave;
       save(meetingId, collabId, sectionKey, tasks => [...tasks, newTask]);
@@ -2536,29 +2330,18 @@ export default function App() {
                         </div>
                         <button className="btn btn-ghost btn-xs" onClick={async () => {
                           try {
-                            // If already has a token stored, reuse it
-                            if (c.invitationToken) {
-                              const link = `${window.location.origin}?invite=${c.invitationToken}`;
-                              await navigator.clipboard.writeText(link);
-                              alert("Lien d'invitation copié !\n\n" + link);
-                              return;
-                            }
-                            // Otherwise create a new one via the API (persisted in Supabase)
-                            const res = await fetch('/api/invitations/create', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ email: c.email, subprojectId: c.subprojectId, tlId: loggedInUser.id })
-                            });
+                            if (c.invitationToken) { const link=`${window.location.origin}?invite=${c.invitationToken}`; await navigator.clipboard.writeText(link); alert("Lien copié !
+
+"+link); return; }
+                            const res = await fetch('/api/invitations/create', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email:c.email, subprojectId:c.subprojectId, tlId:loggedInUser.id }) });
                             const data = await res.json();
-                            if (!res.ok) { alert("Erreur: " + (data.error || "Impossible de créer le lien")); return; }
-                            // Save token on collaborator so we don't re-create it
-                            setCollaborators(prev => prev.map(col => col.id === c.id ? { ...col, invitationToken: data.token } : col));
-                            const link = `${window.location.origin}?invite=${data.token}`;
-                            await navigator.clipboard.writeText(link);
-                            alert("Lien d'invitation copié !\n\n" + link);
-                          } catch {
-                            alert("Erreur lors de la génération du lien.");
-                          }
+                            if (!res.ok) { alert("Erreur: "+(data.error||"impossible")); return; }
+                            setCollaborators(prev => prev.map(col => col.id===c.id ? {...col, invitationToken: data.token} : col));
+                            const link=`${window.location.origin}?invite=${data.token}`;
+                            await navigator.clipboard.writeText(link); alert("Lien copié !
+
+"+link);
+                          } catch { alert("Erreur lors de la génération du lien."); }
                         }}>📋 Copy Link</button>
                       </div>
                     );
@@ -2745,21 +2528,28 @@ export default function App() {
     if (!meeting) return <div className="empty-state"><div className="empty-state-text">Meeting not found</div></div>;
 
     const project = projects.find(p => p.id === meeting.projectId);
-    // For collaborator: find their entry by id OR by email (in case collabId not yet resolved)
     const myCollabEntry = !isTL
-      ? collaborators.find(c => c.id === collabUserId) ||
-        collaborators.find(c => c.email === loggedInUser?.email)
+      ? (collaborators.find(c => c.id === collabUserId) || collaborators.find(c => c.email === loggedInUser?.email))
       : null;
-
     const projectCollabs = isTL
       ? getCollabsForProject(meeting.projectId)
       : (myCollabEntry ? [myCollabEntry] : []);
 
+    const isArchivedMeeting = !isTL && (() => {
+      const collab = collaborators.find(c => c.id === collabUserId);
+      if (!collab || !collab.changeHistory || collab.changeHistory.length === 0) return false;
+      const changes = collab.changeHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const firstChange = changes[0];
+      return meeting.date < firstChange.date;
+    })();
+
     function openAddTask(collabId, sectionKey) {
+      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task: { title: "", description: "", status: "Open", deadline: "" } });
     }
 
     function openEditTask(task, collabId, sectionKey) {
+      if (isArchivedMeeting) return;
       setTaskModal({ collabId, sectionKey, meetingId: meeting.id, task });
     }
 
@@ -2794,13 +2584,12 @@ export default function App() {
           const data = meeting.sections[collab.id] || {};
           return (
             <CollabSection
-              key={`${meeting.id}-${collab.id}`}
+              key={collab.id}
               collab={collab}
               data={data}
               project={project}
               projectColor={project?.color || "#E8531D"}
               isTL={isTL}
-              meetingId={meeting.id}
               onOpenTask={(task) => {
                 const sKey = SECTION_KEYS.find(k => (data[k] || []).find(t => t.id === task.id));
                 openEditTask(task, collab.id, sKey);
