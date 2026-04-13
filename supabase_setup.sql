@@ -1,9 +1,9 @@
 -- ============================================================
--- SUPABASE SETUP v2 — Tables relationnelles
+-- SUPABASE SETUP v3 — Sans contraintes FK (évite les erreurs d'ID)
 -- Exécuter dans Supabase → SQL Editor → New Query
 -- ============================================================
 
--- 0. Drop old tables
+-- 0. Drop everything
 drop table if exists public.meetings cascade;
 drop table if exists public.collaborators cascade;
 drop table if exists public.subprojects cascade;
@@ -39,54 +39,55 @@ create table public.invitation_tokens (
   accepted_at   text
 );
 
--- 3. Projects
+-- 3. Projects (NO FK — tl_id is plain text)
 create table public.projects (
   id         text primary key,
-  tl_id      text references public.users(id) on delete cascade,
+  tl_id      text not null,
   name       text not null default '',
   code       text default '',
   color      text default '#E8531D',
-  date_from  text,
-  date_to    text,
+  date_from  text default '',
+  date_to    text default '',
   created_at timestamptz default now()
 );
 
--- 4. Subprojects
+-- 4. Subprojects (NO FK)
 create table public.subprojects (
   id         text primary key,
-  project_id text references public.projects(id) on delete cascade,
+  project_id text not null,
+  tl_id      text not null,
   name       text not null default '',
   code       text default '',
-  date_from  text,
-  date_to    text
+  date_from  text default '',
+  date_to    text default ''
 );
 
--- 5. Collaborators
+-- 5. Collaborators (NO FK)
 create table public.collaborators (
   id               text primary key,
-  tl_id            text references public.users(id) on delete cascade,
+  tl_id            text not null,
   name             text not null default '',
-  initials         text,
-  email            text,
-  subproject_id    text,
-  date_from        text,
-  date_to          text,
+  initials         text default '',
+  email            text default '',
+  subproject_id    text default '',
+  date_from        text default '',
+  date_to          text default '',
   change_history   jsonb default '[]'::jsonb,
-  invitation_token text
+  invitation_token text default ''
 );
 
--- 6. Meetings (sections = tasks per collab, stored as JSONB)
+-- 6. Meetings (NO FK)
 create table public.meetings (
   id         text primary key,
-  tl_id      text references public.users(id) on delete cascade,
-  project_id text,
-  date       text not null,
-  title      text not null,
+  tl_id      text not null,
+  project_id text default '',
+  date       text not null default '',
+  title      text not null default '',
   sections   jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
 
--- 7. Disable RLS (dev)
+-- 7. Disable RLS
 alter table public.users              disable row level security;
 alter table public.invitation_tokens  disable row level security;
 alter table public.projects           disable row level security;
